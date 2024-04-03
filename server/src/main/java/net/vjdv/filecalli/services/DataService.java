@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import net.vjdv.filecalli.dto.ResultSetWrapper;
 import net.vjdv.filecalli.dto.SetupDTO;
 import net.vjdv.filecalli.exceptions.DataException;
 import net.vjdv.filecalli.util.Configuration;
@@ -16,6 +17,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.function.Consumer;
 
 @Slf4j
 @Service
@@ -50,6 +52,39 @@ public class DataService {
                 throw new DataException("Error reading setup.yml", ex);
             }
             SetupHelper.setupUsers(connection, setupDto.users());
+            try {
+                Files.delete(setupPath);
+            } catch (IOException ex) {
+                throw new DataException("Error deleting setup.yml", ex);
+            }
+        }
+    }
+
+    /**
+     * Execute a query and process the result set
+     *
+     * @param sql      the query
+     * @param consumer the consumer to process the result set
+     * @param params   the query parameters
+     */
+    public void query(String sql, Consumer<ResultSetWrapper> consumer, Object... params) {
+        try (var stmt = connection.prepareStatement(sql)) {
+            for (int i = 0; i < params.length; i++) {
+                if (params[i] instanceof String) {
+                    stmt.setString(i + 1, (String) params[i]);
+                } else if (params[i] instanceof Integer) {
+                    stmt.setInt(i + 1, (int) params[i]);
+                } else if (params[i] instanceof byte[]) {
+                    stmt.setBytes(i + 1, (byte[]) params[i]);
+                } else {
+                    stmt.setObject(i + 1, params[i]);
+                }
+            }
+            try (var rs = stmt.executeQuery()) {
+                consumer.accept(new ResultSetWrapper(rs));
+            }
+        } catch (SQLException ex) {
+            throw new DataException("Error executing query", ex);
         }
     }
 
