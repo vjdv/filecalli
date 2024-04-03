@@ -16,8 +16,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 @Slf4j
 @Service
@@ -61,6 +63,39 @@ public class DataService {
     }
 
     /**
+     * Execute an insert statement and return the autoincremented id
+     *
+     * @param sql    the insert statement
+     * @param params the parameters
+     * @return the autoincremented id
+     */
+    public int insertAutoincrement(String sql, Object... params) {
+        try (var stmt = connection.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS)) {
+            fillParameters(stmt, params);
+            stmt.execute();
+            return stmt.getGeneratedKeys().getInt(1);
+        } catch (SQLException ex) {
+            throw new DataException("Error executing insert", ex);
+        }
+    }
+
+    /**
+     * Execute an update statement
+     *
+     * @param sql    the update statement
+     * @param params the parameters
+     * @return the number of rows affected
+     */
+    public int update(String sql, Object... params) {
+        try (var stmt = connection.prepareStatement(sql)) {
+            fillParameters(stmt, params);
+            return stmt.executeUpdate();
+        } catch (SQLException ex) {
+            throw new DataException("Error executing update", ex);
+        }
+    }
+
+    /**
      * Execute a query and process the result set
      *
      * @param sql      the query
@@ -69,22 +104,55 @@ public class DataService {
      */
     public void query(String sql, Consumer<ResultSetWrapper> consumer, Object... params) {
         try (var stmt = connection.prepareStatement(sql)) {
-            for (int i = 0; i < params.length; i++) {
-                if (params[i] instanceof String) {
-                    stmt.setString(i + 1, (String) params[i]);
-                } else if (params[i] instanceof Integer) {
-                    stmt.setInt(i + 1, (int) params[i]);
-                } else if (params[i] instanceof byte[]) {
-                    stmt.setBytes(i + 1, (byte[]) params[i]);
-                } else {
-                    stmt.setObject(i + 1, params[i]);
-                }
-            }
+            //fill parameters
+            fillParameters(stmt, params);
+            //execute query
             try (var rs = stmt.executeQuery()) {
                 consumer.accept(new ResultSetWrapper(rs));
             }
         } catch (SQLException ex) {
             throw new DataException("Error executing query", ex);
+        }
+    }
+
+    /**
+     * Execute a query, process the result set and return a value
+     *
+     * @param sql      sql query
+     * @param function function to process the result set
+     * @param params   query parameters
+     * @param <T>      the return type of the function
+     * @return the value returned by the function
+     */
+    public <T> T query(String sql, Function<ResultSetWrapper, T> function, Object params) {
+        try (var stmt = connection.prepareStatement(sql)) {
+            fillParameters(stmt, params);
+            try (var rs = stmt.executeQuery()) {
+                return function.apply(new ResultSetWrapper(rs));
+            }
+        } catch (SQLException ex) {
+            throw new DataException("Error executing query", ex);
+        }
+    }
+
+    /**
+     * Fill the parameters of a prepared statement
+     *
+     * @param stmt   prepared statement
+     * @param params parameters
+     * @throws SQLException if there is an error setting the parameters
+     */
+    private void fillParameters(PreparedStatement stmt, Object... params) throws SQLException {
+        for (int i = 0; i < params.length; i++) {
+            if (params[i] instanceof String param) {
+                stmt.setString(i + 1, param);
+            } else if (params[i] instanceof Integer param) {
+                stmt.setInt(i + 1, param);
+            } else if (params[i] instanceof byte[] param) {
+                stmt.setBytes(i + 1, param);
+            } else {
+                stmt.setObject(i + 1, params[i]);
+            }
         }
     }
 

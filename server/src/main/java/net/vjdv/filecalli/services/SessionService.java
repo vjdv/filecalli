@@ -6,6 +6,8 @@ import net.vjdv.filecalli.exceptions.LoginException;
 import net.vjdv.filecalli.util.CryptHelper;
 import org.springframework.stereotype.Service;
 
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -36,8 +38,9 @@ public class SessionService {
                 throw new LoginException("Invalid user or password");
             }
             String name = rs.getString("name");
-            byte[] token = CryptHelper.hashBytes(pass + userId);
-            SessionDTO session = new SessionDTO(userId, name, System.currentTimeMillis() + 3600000, token);
+            byte[] keyBytes = CryptHelper.hashBytes(pass + userId);
+            SecretKey key = new SecretKeySpec(keyBytes, "AES");
+            SessionDTO session = new SessionDTO(userId, name, System.currentTimeMillis() + 3600000, key);
             sessions.put(uid, session);
         }, userId, CryptHelper.hashBytes(pass));
         return uid;

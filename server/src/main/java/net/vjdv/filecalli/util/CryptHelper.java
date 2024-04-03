@@ -1,11 +1,22 @@
 package net.vjdv.filecalli.util;
 
+import lombok.extern.slf4j.Slf4j;
+import net.vjdv.filecalli.exceptions.CryptException;
 import net.vjdv.filecalli.exceptions.ServiceException;
 
+import javax.crypto.Cipher;
+import javax.crypto.CipherOutputStream;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.*;
 
+@Slf4j
 public class CryptHelper {
 
     /**
@@ -21,6 +32,37 @@ public class CryptHelper {
             return digest.digest(text.getBytes(StandardCharsets.UTF_8));
         } catch (NoSuchAlgorithmException ex) {
             throw new ServiceException("Error hashing text", ex);
+        }
+    }
+
+    /**
+     * Encrypts a input stream to a file using AES/CBC/PKCS5Padding
+     *
+     * @param input  Input stream
+     * @param output Output file
+     * @param key    Secret key
+     * @throws IOException If an I/O error occurs
+     */
+    public static void encrypt(InputStream input, Path output, SecretKey key) throws IOException {
+        //random iv
+        byte[] randomBytes = new byte[16];
+        SecureRandom secureRandom = new SecureRandom();
+        secureRandom.nextBytes(randomBytes);
+        //cipher
+        try (input) {
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, key, new IvParameterSpec(randomBytes));
+            //in and out streams
+            try (var outputStream = Files.newOutputStream(output)) {
+                CipherOutputStream cipherOutputStream = new CipherOutputStream(outputStream, cipher);
+                //write iv
+                outputStream.write(randomBytes);
+                //write file
+                input.transferTo(cipherOutputStream);
+            }
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException |
+                 InvalidAlgorithmParameterException ex) {
+            throw new CryptException("Error encrypting file", ex);
         }
     }
 
