@@ -12,11 +12,14 @@ import java.nio.file.Paths;
 public class Configuration {
     private static Configuration instance = null;
     private final Path dataPath;
+    private final Path tempPath;
     private final String salt;
 
     public Configuration(Environment env) {
         //path where all encrypted files are stored
         dataPath = Paths.get(env.getProperty("datapath", "./data"));
+        //path where temporary files are stored
+        tempPath = Paths.get(env.getProperty("temppath", "./temp"));
         //salt used for hashes and encryption
         salt = env.getProperty("salt", "calli");
         instance = this;

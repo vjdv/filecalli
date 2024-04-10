@@ -26,6 +26,7 @@ public class StorageService {
         FileInfo info;
         if (idFile == 0) info = allocateRow(idPath, multipartFile.getOriginalFilename());
         else info = recoverRow(idFile);
+        System.out.println("info: " + info);
         Path parent = config.getDataPath().resolve(info.path);
         //parent directory must exist
         if (!Files.exists(parent)) {
@@ -45,6 +46,18 @@ public class StorageService {
         //update the file size
         String sql = "UPDATE files SET size = ? WHERE id = ?";
         dataService.update(sql, multipartFile.getSize(), info.id);
+    }
+
+    public Path retrieve(int idFile, SecretKey key) {
+        FileInfo info = recoverRow(idFile);
+        Path inputFile = config.getDataPath().resolve(info.path).resolve(Integer.toHexString(info.id));
+        Path outputFile = config.getTempPath().resolve(Integer.toHexString(info.id));
+        try (var inputStream = Files.newInputStream(inputFile)) {
+            CryptHelper.decrypt(inputStream, outputFile, key);
+            return outputFile;
+        } catch (IOException ex) {
+            throw new StorageException("Error retrieving file", ex);
+        }
     }
 
     private FileInfo allocateRow(int dirId, String fileName) {

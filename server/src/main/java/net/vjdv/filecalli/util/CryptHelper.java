@@ -59,10 +59,43 @@ public class CryptHelper {
                 outputStream.write(randomBytes);
                 //write file
                 input.transferTo(cipherOutputStream);
+                cipherOutputStream.close();
             }
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException |
                  InvalidAlgorithmParameterException ex) {
             throw new CryptException("Error encrypting file", ex);
+        }
+    }
+
+    /**
+     * Decrypts a input stream to a file using AES/CBC/PKCS5Padding
+     *
+     * @param input  input stream of encrypted data
+     * @param output output file path
+     * @param key    secret key
+     * @throws IOException if an I/O error occurs
+     */
+    public static void decrypt(InputStream input, Path output, SecretKey key) throws IOException {
+        //read iv
+        byte[] iv = new byte[16];
+        int readed = input.read(iv);
+        if (readed != 16) {
+            throw new CryptException("Error reading IV");
+        }
+        //cipher
+        try (input) {
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(iv));
+            //in and out streams
+            try (var outputStream = Files.newOutputStream(output)) {
+                CipherOutputStream cipherOutputStream = new CipherOutputStream(outputStream, cipher);
+                //write file
+                input.transferTo(cipherOutputStream);
+                cipherOutputStream.close();
+            }
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException |
+                 InvalidAlgorithmParameterException ex) {
+            throw new CryptException("Error decrypting file", ex);
         }
     }
 
