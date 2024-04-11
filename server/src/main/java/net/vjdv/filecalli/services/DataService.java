@@ -18,6 +18,10 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -116,23 +120,43 @@ public class DataService {
     }
 
     /**
-     * Execute a query, process the result set and return a value
+     * Execute a query, process the result set and return one value
      *
      * @param sql      sql query
      * @param function function to process the result set
      * @param params   query parameters
      * @param <T>      the return type of the function
-     * @return the value returned by the function
+     * @return the optional value returned by the function, empty if the result set is empty
      */
-    public <T> T query(String sql, Function<ResultSetWrapper, T> function, Object params) {
-        try (var stmt = connection.prepareStatement(sql)) {
-            fillParameters(stmt, params);
-            try (var rs = stmt.executeQuery()) {
-                return function.apply(new ResultSetWrapper(rs));
+    public <T> Optional<T> queryOne(String sql, Function<ResultSetWrapper, T> function, Object... params) {
+        AtomicReference<T> result = new AtomicReference<>(null);
+        query(sql, rs -> {
+            if (rs.next()) {
+                T item = function.apply(rs);
+                result.set(item);
             }
-        } catch (SQLException ex) {
-            throw new DataException("Error executing query", ex);
-        }
+        }, params);
+        return Optional.ofNullable(result.get());
+    }
+
+    /**
+     * Execute a query, process the result set and return a list of values
+     *
+     * @param sql      sql query
+     * @param function function to process the result set
+     * @param params   query parameters
+     * @param <T>      the return type of the function
+     * @return values available in the result set
+     */
+    public <T> List<T> queryList(String sql, Function<ResultSetWrapper, T> function, Object... params) {
+        List<T> list = new ArrayList<>();
+        query(sql, rs -> {
+            while (rs.next()) {
+                T item = function.apply(rs);
+                list.add(item);
+            }
+        }, params);
+        return list;
     }
 
     /**

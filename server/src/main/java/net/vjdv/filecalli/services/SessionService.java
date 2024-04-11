@@ -31,16 +31,17 @@ public class SessionService {
      * @throws LoginException if the user or password are invalid
      */
     public String login(String userId, String pass) {
-        String sql = "SELECT id, name FROM users WHERE id = ? AND password = ?";
+        String sql = "SELECT id, name, root_directory FROM users WHERE id = ? AND password = ?";
         String uid = java.util.UUID.randomUUID().toString();
         dataService.query(sql, rs -> {
             if (!rs.next()) {
                 throw new LoginException("Invalid user or password");
             }
             String name = rs.getString("name");
+            int rootDir = rs.getInt("root_directory");
             byte[] keyBytes = CryptHelper.hashBytes(pass + userId);
             SecretKey key = new SecretKeySpec(keyBytes, "AES");
-            SessionDTO session = new SessionDTO(userId, name, System.currentTimeMillis() + 3600000, key);
+            SessionDTO session = new SessionDTO(userId, name, rootDir, System.currentTimeMillis() + 3600000, key);
             sessions.put(uid, session);
         }, userId, CryptHelper.hashBytes(pass));
         return uid;

@@ -24,6 +24,22 @@ public class ResultSetWrapper {
         }
     }
 
+    public int getInt(String column) {
+        try {
+            return rs.getInt(column);
+        } catch (SQLException ex) {
+            throw new DataException("Error getting int from column " + column, ex);
+        }
+    }
+
+    public int getInt(int column) {
+        try {
+            return rs.getInt(column);
+        } catch (SQLException ex) {
+            throw new DataException("Error getting int from column " + column, ex);
+        }
+    }
+
     public String getString(String column) {
         try {
             return rs.getString(column);

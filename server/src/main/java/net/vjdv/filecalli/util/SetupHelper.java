@@ -32,7 +32,6 @@ public class SetupHelper {
                 CREATE TABLE files (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
-                    path TEXT NOT NULL,
                     size INTEGER NOT NULL,
                     directory_id INTEGER NOT NULL,
                     FOREIGN KEY (directory_id) REFERENCES directories (id)
