@@ -12,6 +12,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -23,6 +25,47 @@ public class StorageService {
     public StorageService(DataService dataService, Configuration configuration) {
         this.dataService = dataService;
         this.config = configuration;
+    }
+
+    /**
+     * Lists the contents of a directory
+     *
+     * @param path    directory path
+     * @param rootDir user root directory
+     * @return list of directories and files
+     */
+    public List<ListedResource> list(String path, int rootDir) {
+        int directoryId = resolveDir(path, rootDir);
+        // directories
+        String sql1 = "SELECT id, name FROM directories WHERE parent = ?";
+        List<ListedResource> dirs = dataService.queryList(sql1, rs -> new ListedResource(rs.getString(2), true, false, 0), directoryId);
+        // files
+        String sql2 = "SELECT id, name, size FROM files WHERE directory_id = ?";
+        List<ListedResource> files = dataService.queryList(sql2, rs -> new ListedResource(rs.getString(2), false, true, rs.getInt(3)), directoryId);
+        //return
+        List<ListedResource> resources = new ArrayList<>();
+        resources.addAll(dirs);
+        resources.addAll(files);
+        return resources;
+    }
+
+    /**
+     * Creates a directory in the storage
+     *
+     * @param path    directory path
+     * @param session user session
+     * @return the directory id
+     */
+    public int createDirectory(String path, SessionDTO session) {
+        if ("/".equals(path)) throw new StorageException("Invalid directory name");
+        if (!path.startsWith("/")) throw new StorageException("Path must start with /");
+        if (path.endsWith("/")) throw new StorageException("Directory name must not end with /");
+        int slashIndex = path.lastIndexOf("/");
+        String dirPath = path.substring(0, slashIndex + 1);
+        String dirName = path.substring(slashIndex + 1);
+        int parentDir = resolveDir(dirPath, session.rootDir());
+        String sql = "INSERT INTO directories (name, parent, owner) VALUES (?, ?, ?)";
+        return dataService.insertAutoincrement(sql, dirName, parentDir, session.userId());
     }
 
     /**
@@ -146,6 +189,9 @@ public class StorageService {
     }
 
     public record FileData2(int idFile, int size) {
+    }
+
+    public record ListedResource(String name, boolean isDirectory, boolean isRegularFile, int size) {
     }
 
 }
