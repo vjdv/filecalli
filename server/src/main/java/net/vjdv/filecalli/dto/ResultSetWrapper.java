@@ -56,4 +56,20 @@ public class ResultSetWrapper {
         }
     }
 
+    public long getLong(String column) {
+        try {
+            return rs.getLong(column);
+        } catch (SQLException ex) {
+            throw new DataException("Error getting long from column " + column, ex);
+        }
+    }
+
+    public long getLong(int column) {
+        try {
+            return rs.getLong(column);
+        } catch (SQLException ex) {
+            throw new DataException("Error getting long from column " + column, ex);
+        }
+    }
+
 }

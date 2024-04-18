@@ -12,6 +12,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -38,10 +39,16 @@ public class StorageService {
         int directoryId = resolveDir(path, rootDir);
         // directories
         String sql1 = "SELECT id, name FROM directories WHERE parent = ?";
-        List<ListedResource> dirs = dataService.queryList(sql1, rs -> new ListedResource(rs.getString(2), true, false, 0), directoryId);
+        List<ListedResource> dirs = dataService.queryList(sql1, rs -> new ListedResource(rs.getString(2), true, false, 0, 0, 0), directoryId);
         // files
-        String sql2 = "SELECT id, name, size FROM files WHERE directory_id = ?";
-        List<ListedResource> files = dataService.queryList(sql2, rs -> new ListedResource(rs.getString(2), false, true, rs.getInt(3)), directoryId);
+        String sql2 = "SELECT id, name, size, created_at, last_modified FROM files WHERE directory_id = ?";
+        List<ListedResource> files = dataService.queryList(sql2, rs -> {
+            String name = rs.getString("name");
+            int size = rs.getInt("size");
+            long createdAt = rs.getLong("created_at");
+            long lastModified = rs.getLong("last_modified");
+            return new ListedResource(name, false, true, size, createdAt, lastModified);
+        }, directoryId);
         //return
         List<ListedResource> resources = new ArrayList<>();
         resources.addAll(dirs);
@@ -60,12 +67,13 @@ public class StorageService {
         if ("/".equals(path)) throw new StorageException("Invalid directory name");
         if (!path.startsWith("/")) throw new StorageException("Path must start with /");
         if (path.endsWith("/")) throw new StorageException("Directory name must not end with /");
+        long now = Instant.now().toEpochMilli();
         int slashIndex = path.lastIndexOf("/");
         String dirPath = path.substring(0, slashIndex + 1);
         String dirName = path.substring(slashIndex + 1);
         int parentDir = resolveDir(dirPath, session.rootDir());
-        String sql = "INSERT INTO directories (name, parent, owner) VALUES (?, ?, ?)";
-        return dataService.insertAutoincrement(sql, dirName, parentDir, session.userId());
+        String sql = "INSERT INTO directories (name, parent, owner, created_at, last_modified) VALUES (?, ?, ?, ?, ?)";
+        return dataService.insertAutoincrement(sql, dirName, parentDir, session.userId(), now, now);
     }
 
     /**
@@ -82,9 +90,10 @@ public class StorageService {
         int dirId = data1.dirId;
         int idFile = data1.fileId;
         //Get info from db
+        long now = Instant.now().toEpochMilli();
         if (idFile == 0) {
-            String sql = "INSERT INTO files (name, size, directory_id) VALUES (?, 0, ?)";
-            idFile = dataService.insertAutoincrement(sql, data1.fileName, dirId);
+            String sql = "INSERT INTO files (name, size, directory_id, created_at, last_modified) VALUES (?, 0, ?, ?, 0)";
+            idFile = dataService.insertAutoincrement(sql, data1.fileName, dirId, now);
         }
         log.info("Storing {} file id={}", data1.fileId == 0 ? "new" : "existing", idFile);
         Path fileDestPath = computeFilePath(idFile);
@@ -104,8 +113,8 @@ public class StorageService {
             throw new StorageException("Error storing file", ex);
         }
         //update the file size
-        String sql = "UPDATE files SET size = ? WHERE id = ?";
-        dataService.update(sql, multipartFile.getSize(), idFile);
+        String sql = "UPDATE files SET size = ?, last_modified = ? WHERE id = ?";
+        dataService.update(sql, multipartFile.getSize(), now, idFile);
     }
 
     /**
@@ -191,7 +200,8 @@ public class StorageService {
     public record FileData2(int idFile, int size) {
     }
 
-    public record ListedResource(String name, boolean isDirectory, boolean isRegularFile, int size) {
+    public record ListedResource(String name, boolean isDirectory, boolean isRegularFile, int size, long createdAt,
+                                 long lastModified) {
     }
 
 }

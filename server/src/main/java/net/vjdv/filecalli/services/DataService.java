@@ -172,6 +172,8 @@ public class DataService {
                 stmt.setString(i + 1, param);
             } else if (params[i] instanceof Integer param) {
                 stmt.setInt(i + 1, param);
+            } else if (params[i] instanceof Long param) {
+                stmt.setLong(i + 1, param);
             } else if (params[i] instanceof byte[] param) {
                 stmt.setBytes(i + 1, param);
             } else {

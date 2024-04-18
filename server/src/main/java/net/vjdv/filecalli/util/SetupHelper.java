@@ -6,6 +6,7 @@ import net.vjdv.filecalli.exceptions.DataException;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.Instant;
 
 @Slf4j
 public class SetupHelper {
@@ -18,6 +19,8 @@ public class SetupHelper {
                     name TEXT NOT NULL,
                     parent INTEGER NULL,
                     owner TEXT NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    last_modified INTEGER NOT NULL,
                     FOREIGN KEY (parent) REFERENCES directories (id)
                 )""");
         createTable(conn, "users", """
@@ -33,6 +36,8 @@ public class SetupHelper {
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
                     size INTEGER NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    last_modified INTEGER NOT NULL,
                     directory_id INTEGER NOT NULL,
                     FOREIGN KEY (directory_id) REFERENCES directories (id)
                 )""");
@@ -49,7 +54,7 @@ public class SetupHelper {
     public static void setupUsers(Connection conn, SetupUserDTO[] users) {
         log.info("Creating users");
         var sql1 = "INSERT INTO users (id, name, password, root_directory) VALUES (?, ?, ?, 99999)";
-        var sql2 = "INSERT INTO directories (name, owner) VALUES ('/', ?)";
+        var sql2 = "INSERT INTO directories (name, owner, created_at, last_modified) VALUES ('/', ?, ?, ?)";
         var sql3 = "UPDATE users SET root_directory = ? WHERE id = ?";
         for (SetupUserDTO user : users) {
             // insert user
@@ -64,7 +69,10 @@ public class SetupHelper {
             // insert root directory of user
             int directoryId;
             try (var ps = conn.prepareStatement(sql2)) {
+                long now = Instant.now().toEpochMilli();
                 ps.setString(1, user.id());
+                ps.setLong(2, now);
+                ps.setLong(3, now);
                 ps.execute();
                 directoryId = ps.getGeneratedKeys().getInt(1);
             } catch (SQLException ex) {
