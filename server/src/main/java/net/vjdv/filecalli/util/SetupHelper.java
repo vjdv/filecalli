@@ -35,6 +35,7 @@ public class SetupHelper {
                 CREATE TABLE files (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
+                    mime TEXT NOT NULL,
                     size INTEGER NOT NULL,
                     created_at INTEGER NOT NULL,
                     last_modified INTEGER NOT NULL,

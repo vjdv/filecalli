@@ -89,11 +89,14 @@ public class StorageService {
         var data1 = resolveFile(filePath, session.rootDir());
         int dirId = data1.dirId;
         int idFile = data1.fileId;
-        //Get info from db
+        //some data
         long now = Instant.now().toEpochMilli();
+        String mime = multipartFile.getContentType();
+        if (mime == null) mime = "application/octet-stream";
+        //insert row if file does not exist
         if (idFile == 0) {
-            String sql = "INSERT INTO files (name, size, directory_id, created_at, last_modified) VALUES (?, 0, ?, ?, 0)";
-            idFile = dataService.insertAutoincrement(sql, data1.fileName, dirId, now);
+            String sql = "INSERT INTO files (name, mime, size, directory_id, created_at, last_modified) VALUES (?, ?, 0, ?, ?, 0)";
+            idFile = dataService.insertAutoincrement(sql, data1.fileName, mime, dirId, now);
         }
         log.info("Storing {} file id={}", data1.fileId == 0 ? "new" : "existing", idFile);
         Path fileDestPath = computeFilePath(idFile);
