@@ -7,6 +7,7 @@ import net.vjdv.filecalli.exceptions.DataException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.UUID;
 
 @Slf4j
 public class SetupHelper {
@@ -18,7 +19,6 @@ public class SetupHelper {
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
                     parent INTEGER NULL,
-                    owner TEXT NOT NULL,
                     created_at INTEGER NOT NULL,
                     last_modified INTEGER NOT NULL,
                     FOREIGN KEY (parent) REFERENCES directories (id)
@@ -29,6 +29,7 @@ public class SetupHelper {
                     name TEXT NOT NULL,
                     password BLOB NOT NULL,
                     root_directory INTEGER NOT NULL,
+                    webdav_suffix TEXT NULL,
                     FOREIGN KEY (root_directory) REFERENCES directories (id)
                 )""");
         createTable(conn, "files", """
@@ -41,6 +42,14 @@ public class SetupHelper {
                     last_modified INTEGER NOT NULL,
                     directory_id INTEGER NOT NULL,
                     FOREIGN KEY (directory_id) REFERENCES directories (id)
+                )""");
+        createTable(conn, "webdav_tokens", """
+                CREATE TABLE webdav_tokens (
+                    token TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    path TEXT NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users (id)
                 )""");
     }
 
@@ -55,7 +64,7 @@ public class SetupHelper {
     public static void setupUsers(Connection conn, SetupUserDTO[] users) {
         log.info("Creating users");
         var sql1 = "INSERT INTO users (id, name, password, root_directory) VALUES (?, ?, ?, 99999)";
-        var sql2 = "INSERT INTO directories (name, owner, created_at, last_modified) VALUES ('/', ?, ?, ?)";
+        var sql2 = "INSERT INTO directories (name, created_at, last_modified) VALUES ('/', ?, ?)";
         var sql3 = "UPDATE users SET root_directory = ? WHERE id = ?";
         for (SetupUserDTO user : users) {
             // insert user
@@ -71,9 +80,8 @@ public class SetupHelper {
             int directoryId;
             try (var ps = conn.prepareStatement(sql2)) {
                 long now = Instant.now().toEpochMilli();
-                ps.setString(1, user.id());
+                ps.setLong(1, now);
                 ps.setLong(2, now);
-                ps.setLong(3, now);
                 ps.execute();
                 directoryId = ps.getGeneratedKeys().getInt(1);
             } catch (SQLException ex) {
@@ -87,6 +95,38 @@ public class SetupHelper {
             } catch (SQLException ex) {
                 throw new DataException("Error updating user", ex);
             }
+            //enable webdav
+            if (user.webdav()) {
+                enableWebdav(conn, user.id(), directoryId);
+            }
+        }
+    }
+
+    /**
+     * Creates webdav suffix enabling webdav for user
+     */
+    public static void enableWebdav(Connection conn, String userId, int rootDirectory) {
+        log.info("Enabling webdav for user {}", userId);
+        //creates suffix
+        var sql = "UPDATE users SET webdav_suffix = ? WHERE id = ?";
+        try (var ps = conn.prepareStatement(sql)) {
+            String suffix = UUID.randomUUID().toString().substring(0, 8);
+            ps.setString(1, suffix);
+            ps.setString(2, userId);
+            ps.execute();
+        } catch (SQLException ex) {
+            throw new DataException("Error enabling webdav", ex);
+        }
+        // insert webdav directory of user
+        var sql2 = "INSERT INTO directories (name, parent, created_at, last_modified) VALUES ('webdav', ?, ?, ?)";
+        try (var ps = conn.prepareStatement(sql2)) {
+            long now = Instant.now().toEpochMilli();
+            ps.setInt(1, rootDirectory);
+            ps.setLong(2, now);
+            ps.setLong(3, now);
+            ps.execute();
+        } catch (SQLException ex) {
+            throw new DataException("Error creating directory", ex);
         }
     }
 

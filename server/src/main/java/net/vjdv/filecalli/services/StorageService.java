@@ -9,6 +9,7 @@ import net.vjdv.filecalli.util.CryptHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.crypto.SecretKey;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -72,8 +73,8 @@ public class StorageService {
         String dirPath = path.substring(0, slashIndex + 1);
         String dirName = path.substring(slashIndex + 1);
         int parentDir = resolveDir(dirPath, session.rootDir());
-        String sql = "INSERT INTO directories (name, parent, owner, created_at, last_modified) VALUES (?, ?, ?, ?, ?)";
-        return dataService.insertAutoincrement(sql, dirName, parentDir, session.userId(), now, now);
+        String sql = "INSERT INTO directories (name, parent, created_at, last_modified) VALUES (?, ?, ?, ?, ?)";
+        return dataService.insertAutoincrement(sql, dirName, parentDir, now, now);
     }
 
     /**
@@ -110,8 +111,10 @@ public class StorageService {
             }
         }
         //store the file
+        SecretKey key = session.key();
+        if (filePath.startsWith("/webdav/")) key = session.webdavKey();
         try {
-            CryptHelper.encrypt(multipartFile.getInputStream(), fileDestPath, session.key());
+            CryptHelper.encrypt(multipartFile.getInputStream(), fileDestPath, key);
         } catch (IOException ex) {
             throw new StorageException("Error storing file", ex);
         }
@@ -133,8 +136,10 @@ public class StorageService {
         var data = resolveFile(filePath, session.rootDir());
         if (data.fileId == 0) throw new ResourceNotFoundException("File " + filePath + " does not exist");
         Path inputFile = computeFilePath(data.fileId);
+        SecretKey key = session.key();
+        if (filePath.startsWith("/webdav/")) key = session.webdavKey();
         try (var inputStream = Files.newInputStream(inputFile)) {
-            CryptHelper.decrypt(inputStream, outputPath, session.key());
+            CryptHelper.decrypt(inputStream, outputPath, key);
             return data;
         } catch (IOException ex) {
             throw new StorageException("Error retrieving file", ex);

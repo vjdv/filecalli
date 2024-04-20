@@ -31,7 +31,7 @@ public class SessionService {
      * @throws LoginException if the user or password are invalid
      */
     public String login(String userId, String pass) {
-        String sql = "SELECT id, name, root_directory FROM users WHERE id = ? AND password = ?";
+        String sql = "SELECT id, name, root_directory, webdav_suffix FROM users WHERE id = ? AND password = ?";
         String uid = java.util.UUID.randomUUID().toString();
         dataService.query(sql, rs -> {
             if (!rs.next()) {
@@ -39,9 +39,18 @@ public class SessionService {
             }
             String name = rs.getString("name");
             int rootDir = rs.getInt("root_directory");
+            String webdavSuffix = rs.getString("webdav_suffix");
+            //files key
             byte[] keyBytes = CryptHelper.hashBytes(pass + userId);
             SecretKey key = new SecretKeySpec(keyBytes, "AES");
-            SessionDTO session = new SessionDTO(userId, name, rootDir, System.currentTimeMillis() + 3600000, key);
+            //webdav key
+            SecretKey webdavKey = null;
+            if (webdavSuffix != null) {
+                byte[] webdavKeyBytes = CryptHelper.hashBytes(userId + "webdav");
+                webdavKey = new SecretKeySpec(webdavKeyBytes, "AES");
+            }
+            //session object
+            SessionDTO session = new SessionDTO(userId, name, rootDir, System.currentTimeMillis() + 3600000, key, webdavKey);
             sessions.put(uid, session);
         }, userId, CryptHelper.hashBytes(pass));
         return uid;
