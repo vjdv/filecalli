@@ -1,6 +1,8 @@
 package net.vjdv.filecalli.services;
 
 import lombok.extern.slf4j.Slf4j;
+import net.vjdv.filecalli.dto.FileDataDTO;
+import net.vjdv.filecalli.dto.RetrievedFileDTO;
 import net.vjdv.filecalli.dto.SessionDTO;
 import net.vjdv.filecalli.exceptions.ResourceNotFoundException;
 import net.vjdv.filecalli.exceptions.StorageException;
@@ -22,10 +24,12 @@ import java.util.List;
 public class StorageService {
 
     private final DataService dataService;
+    private final TasksService tasksService;
     private final Configuration config;
 
-    public StorageService(DataService dataService, Configuration configuration) {
+    public StorageService(DataService dataService, TasksService tasksService, Configuration configuration) {
         this.dataService = dataService;
+        this.tasksService = tasksService;
         this.config = configuration;
     }
 
@@ -88,8 +92,8 @@ public class StorageService {
     public void store(String filePath, MultipartFile multipartFile, SessionDTO session) {
         //Resolves dirId and fileId
         var data1 = resolveFile(filePath, session.rootDir());
-        int dirId = data1.dirId;
-        int idFile = data1.fileId;
+        int dirId = data1.directoryId();
+        int idFile = data1.id();
         //some data
         long now = Instant.now().toEpochMilli();
         String mime = multipartFile.getContentType();
@@ -97,9 +101,9 @@ public class StorageService {
         //insert row if file does not exist
         if (idFile == 0) {
             String sql = "INSERT INTO files (name, mime, size, directory_id, created_at, last_modified) VALUES (?, ?, 0, ?, ?, 0)";
-            idFile = dataService.insertAutoincrement(sql, data1.fileName, mime, dirId, now);
+            idFile = dataService.insertAutoincrement(sql, data1.name(), mime, dirId, now);
         }
-        log.info("Storing {} file id={}", data1.fileId == 0 ? "new" : "existing", idFile);
+        log.info("Storing {} file id={}", data1.id() == 0 ? "new" : "existing", idFile);
         Path fileDestPath = computeFilePath(idFile);
         Path parent = fileDestPath.getParent();
         //parent directory must exist
@@ -126,21 +130,21 @@ public class StorageService {
     /**
      * Retrieves a file from the storage
      *
-     * @param filePath   user's file path
-     * @param outputPath path to store the decrypted file
-     * @param session    user's session
+     * @param filePath user's file path
+     * @param session  user's session
      * @return file data like id and size
      * @throws ResourceNotFoundException if the file does not exist
      */
-    public FileData1 retrieve(String filePath, Path outputPath, SessionDTO session) {
+    public RetrievedFileDTO retrieve(String filePath, SessionDTO session) {
         var data = resolveFile(filePath, session.rootDir());
-        if (data.fileId == 0) throw new ResourceNotFoundException("File " + filePath + " does not exist");
-        Path inputFile = computeFilePath(data.fileId);
+        if (data.id() == 0) throw new ResourceNotFoundException("File " + filePath + " does not exist");
+        Path inputFile = computeFilePath(data.id());
         SecretKey key = session.key();
         if (filePath.startsWith("/webdav/")) key = session.webdavKey();
         try (var inputStream = Files.newInputStream(inputFile)) {
+            var outputPath = tasksService.getTempFile();
             CryptHelper.decrypt(inputStream, outputPath, key);
-            return data;
+            return new RetrievedFileDTO(data, outputPath);
         } catch (IOException ex) {
             throw new StorageException("Error retrieving file", ex);
         }
@@ -176,16 +180,24 @@ public class StorageService {
      * @return file data, if the file does not exist, the fileId is 0
      * @throws ResourceNotFoundException if the directory does not exist
      */
-    protected FileData1 resolveFile(String path, int rootDir) {
+    protected FileDataDTO resolveFile(String path, int rootDir) {
         if ("/".equals(path)) throw new ResourceNotFoundException("Invalid file path");
         if (!path.startsWith("/")) throw new ResourceNotFoundException("Path must start with /");
         int slashIndex = path.lastIndexOf("/");
         String dirPath = path.substring(0, slashIndex + 1);
         String fileName = path.substring(slashIndex + 1);
         int dirId = resolveDir(dirPath, rootDir);
-        String sql = "SELECT id, size FROM files WHERE name = ? AND directory_id = ?";
-        var fileData = dataService.queryOne(sql, rs -> new FileData2(rs.getInt(1), rs.getInt(2)), fileName, dirId);
-        return fileData.map(o -> new FileData1(dirId, o.idFile(), fileName, o.size())).orElseGet(() -> new FileData1(dirId, 0, fileName, 0));
+        String sql = "SELECT id, name, mime, size, created_at, last_modified FROM files WHERE name = ? AND directory_id = ?";
+        var fileData = dataService.queryOne(sql, rs -> {
+            int id = rs.getInt(1);
+            String name = rs.getString(2);
+            String mime = rs.getString(3);
+            long size = rs.getLong(4);
+            long createdAt = rs.getLong(5);
+            long lastModified = rs.getLong(6);
+            return new FileDataDTO(id, name, mime, size, createdAt, lastModified, dirId);
+        }, fileName, dirId);
+        return fileData.orElseGet(() -> new FileDataDTO(0, fileName, "", 0, 0, 0, dirId));
     }
 
     /**
@@ -200,12 +212,6 @@ public class StorageService {
             fileName.insert(0, "0");
         }
         return config.getDataPath().resolve(Integer.toHexString(fileId / 1000 + 160)).resolve(fileName.toString());
-    }
-
-    public record FileData1(int dirId, int fileId, String fileName, int size) {
-    }
-
-    public record FileData2(int idFile, int size) {
     }
 
     public record ListedResource(String name, boolean isDirectory, boolean isRegularFile, int size, long createdAt,

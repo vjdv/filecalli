@@ -1,6 +1,8 @@
 package net.vjdv.filecalli.services;
 
 import lombok.extern.slf4j.Slf4j;
+import net.vjdv.filecalli.dto.RetrievedFileDTO;
+import net.vjdv.filecalli.dto.WebdavSessionDTO;
 import net.vjdv.filecalli.dto.webdav.Multistatus;
 import net.vjdv.filecalli.exceptions.ResourceNotFoundException;
 import net.vjdv.filecalli.util.Configuration;
@@ -51,7 +53,7 @@ public class WebdavService {
 
     private Multistatus propfindFile(String path, int rootDir) {
         var data = storageService.resolveFile(path, rootDir);
-        if (data.fileId() == 0) throw new ResourceNotFoundException("File " + path + " does not exist");
+        if (data.id() == 0) throw new ResourceNotFoundException("File " + path + " does not exist");
         String sql = "SELECT name, mime, size, created_at, last_modified FROM files WHERE id = ?";
         return dataService.queryOne(sql, rs -> {
             String name = rs.getString("name");
@@ -60,7 +62,11 @@ public class WebdavService {
             long createdAt = rs.getLong("created_at");
             long lastModified = rs.getLong("last_modified");
             return Multistatus.builder().file(name, mime, size, createdAt, lastModified).build();
-        }, data.fileId()).orElseThrow(() -> new ResourceNotFoundException("File " + path + " does not exist"));
+        }, data.id()).orElseThrow(() -> new ResourceNotFoundException("File " + path + " does not exist"));
+    }
+
+    public RetrievedFileDTO retrieve(String path, WebdavSessionDTO wdsessionDTO) {
+        return storageService.retrieve(path, wdsessionDTO.toSessionDTO());
     }
 
 }

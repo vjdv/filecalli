@@ -2,6 +2,7 @@ package net.vjdv.filecalli.services;
 
 import lombok.extern.slf4j.Slf4j;
 import net.vjdv.filecalli.dto.SessionDTO;
+import net.vjdv.filecalli.dto.WebdavSessionDTO;
 import net.vjdv.filecalli.exceptions.LoginException;
 import net.vjdv.filecalli.exceptions.ServiceException;
 import net.vjdv.filecalli.util.CryptHelper;
@@ -20,6 +21,7 @@ public class SessionService {
 
     private final DataService dataService;
     private final Map<String, SessionDTO> sessions = new HashMap<>();
+    private final Map<String, WebdavSessionDTO> wdsessions = new HashMap<>();
 
     public SessionService(DataService dataService) {
         this.dataService = dataService;
@@ -83,9 +85,9 @@ public class SessionService {
      * @return session data
      * @throws LoginException if the basic auth is invalid
      */
-    public SessionDTO getSessionFromBasicAuth(String b64) {
+    public WebdavSessionDTO getSessionFromBasicAuth(String b64) {
         if (b64 == null) throw new LoginException("No basic auth was provided");
-        if (sessions.containsKey(b64)) return sessions.get(b64);
+        if (wdsessions.containsKey(b64)) return wdsessions.get(b64);
         //reads base64 and extract values
         String[] parts;
         try {
@@ -97,7 +99,7 @@ public class SessionService {
         }
         //query from db
         String sql = "SELECT w.path, u.webdav_suffix, u.root_directory FROM webdav_tokens W INNER JOIN users U ON w.user_id = u.id WHERE w.token = ? AND u.id = ?";
-        return dataService.queryOne(sql, rs -> {
+        var session = dataService.queryOne(sql, rs -> {
             String path = "/webdav" + rs.getString(1);
             String suffix = rs.getString(2);
             int rootDir = rs.getInt(3);
@@ -106,8 +108,11 @@ public class SessionService {
             }
             byte[] keyBytes = CryptHelper.hashBytes(parts[0] + suffix);
             SecretKey key = new SecretKeySpec(keyBytes, "AES");
-            return new SessionDTO(parts[0], path, rootDir, Long.MAX_VALUE, null, key);
+            return new WebdavSessionDTO(parts[0], path, rootDir, key);
         }, parts[1], parts[0]).orElseThrow(() -> new LoginException("invalid user or password"));
+        //cache and return
+        wdsessions.put(b64, session);
+        return session;
     }
 
 }

@@ -5,6 +5,7 @@ import jakarta.xml.bind.annotation.XmlAccessorType;
 import jakarta.xml.bind.annotation.XmlElement;
 import lombok.Getter;
 import lombok.Setter;
+import net.vjdv.filecalli.util.Utils;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -42,7 +43,7 @@ public class Prop {
         this.displayname = displayname;
         this.contentType = "directory";
         this.creationdate = Instant.ofEpochMilli(creationdate).atZone(ZoneId.systemDefault()).format(CREATED_FORMAT);
-        this.getlastmodified = Instant.ofEpochMilli(getlastmodified).atZone(ZoneId.systemDefault()).format(MODIFIED_FORMAT);
+        this.getlastmodified = Utils.toRFC7231(getlastmodified);
     }
 
     public Prop(String displayname, String mime, long size, long creationdate, long getlastmodified) {
@@ -50,7 +51,7 @@ public class Prop {
         this.contentType = mime;
         this.contentLength = String.valueOf(size);
         this.creationdate = Instant.ofEpochMilli(creationdate).atZone(ZoneId.systemDefault()).format(CREATED_FORMAT);
-        this.getlastmodified = Instant.ofEpochMilli(getlastmodified).atZone(ZoneId.systemDefault()).format(MODIFIED_FORMAT);
+        this.getlastmodified = Utils.toRFC7231(getlastmodified);
     }
 
 }
