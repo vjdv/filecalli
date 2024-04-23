@@ -160,6 +160,21 @@ public class DataService {
     }
 
     /**
+     * Executes a consumer for each result in the result set
+     *
+     * @param sql      sql query
+     * @param consumer consumer to process the result set
+     * @param params   query parameters
+     */
+    public void forEach(String sql, Consumer<ResultSetWrapper> consumer, Object... params) {
+        query(sql, rs -> {
+            while (rs.next()) {
+                consumer.accept(rs);
+            }
+        }, params);
+    }
+
+    /**
      * Fill the parameters of a prepared statement
      *
      * @param stmt   prepared statement

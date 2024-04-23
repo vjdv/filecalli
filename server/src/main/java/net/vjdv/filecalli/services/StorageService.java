@@ -154,7 +154,7 @@ public class StorageService {
      * @return directory id
      * @throws ResourceNotFoundException if the path does not exist
      */
-    private int resolveDir(String path, int rootDir) {
+    protected int resolveDir(String path, int rootDir) {
         if ("/".equals(path)) return rootDir;
         if (!path.startsWith("/")) throw new ResourceNotFoundException("Path must start with /");
         String[] paths = path.substring(1).split("/");
@@ -176,7 +176,7 @@ public class StorageService {
      * @return file data, if the file does not exist, the fileId is 0
      * @throws ResourceNotFoundException if the directory does not exist
      */
-    private FileData1 resolveFile(String path, int rootDir) {
+    protected FileData1 resolveFile(String path, int rootDir) {
         if ("/".equals(path)) throw new ResourceNotFoundException("Invalid file path");
         if (!path.startsWith("/")) throw new ResourceNotFoundException("Path must start with /");
         int slashIndex = path.lastIndexOf("/");

@@ -11,11 +11,14 @@ import java.nio.file.Paths;
 @Component
 public class Configuration {
     private static Configuration instance = null;
+    private final String host;
     private final Path dataPath;
     private final Path tempPath;
     private final String salt;
 
     public Configuration(Environment env) {
+        //host where the server is running
+        host = env.getProperty("host", "http://localhost:8080");
         //path where all encrypted files are stored
         dataPath = Paths.get(env.getProperty("datapath", "./data"));
         //path where temporary files are stored

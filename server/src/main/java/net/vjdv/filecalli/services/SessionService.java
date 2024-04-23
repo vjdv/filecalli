@@ -3,11 +3,14 @@ package net.vjdv.filecalli.services;
 import lombok.extern.slf4j.Slf4j;
 import net.vjdv.filecalli.dto.SessionDTO;
 import net.vjdv.filecalli.exceptions.LoginException;
+import net.vjdv.filecalli.exceptions.ServiceException;
 import net.vjdv.filecalli.util.CryptHelper;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -46,7 +49,7 @@ public class SessionService {
             //webdav key
             SecretKey webdavKey = null;
             if (webdavSuffix != null) {
-                byte[] webdavKeyBytes = CryptHelper.hashBytes(userId + "webdav");
+                byte[] webdavKeyBytes = CryptHelper.hashBytes(userId + webdavSuffix);
                 webdavKey = new SecretKeySpec(webdavKeyBytes, "AES");
             }
             //session object
@@ -71,6 +74,40 @@ public class SessionService {
             throw new LoginException("Session expired");
         }
         return session;
+    }
+
+    /**
+     * Get a session from a basic auth string
+     *
+     * @param b64 the basic auth string (withoiut the "Basic" prefix)
+     * @return session data
+     * @throws LoginException if the basic auth is invalid
+     */
+    public SessionDTO getSessionFromBasicAuth(String b64) {
+        if (b64 == null) throw new LoginException("No basic auth was provided");
+        if (sessions.containsKey(b64)) return sessions.get(b64);
+        //reads base64 and extract values
+        String[] parts;
+        try {
+            String decoded = new String(Base64.getDecoder().decode(b64), StandardCharsets.UTF_8);
+            parts = decoded.split(":");
+            if (parts.length != 2) throw new IllegalArgumentException();
+        } catch (IllegalArgumentException ex) {
+            throw new LoginException("Invalid basic auth");
+        }
+        //query from db
+        String sql = "SELECT w.path, u.webdav_suffix, u.root_directory FROM webdav_tokens W INNER JOIN users U ON w.user_id = u.id WHERE w.token = ? AND u.id = ?";
+        return dataService.queryOne(sql, rs -> {
+            String path = "/webdav" + rs.getString(1);
+            String suffix = rs.getString(2);
+            int rootDir = rs.getInt(3);
+            if (suffix == null) {
+                throw new ServiceException("Webdav not enabled for user");
+            }
+            byte[] keyBytes = CryptHelper.hashBytes(parts[0] + suffix);
+            SecretKey key = new SecretKeySpec(keyBytes, "AES");
+            return new SessionDTO(parts[0], path, rootDir, Long.MAX_VALUE, null, key);
+        }, parts[1], parts[0]).orElseThrow(() -> new LoginException("invalid user or password"));
     }
 
 }
