@@ -8,6 +8,8 @@ import net.vjdv.filecalli.exceptions.ResourceNotFoundException;
 import net.vjdv.filecalli.util.Configuration;
 import org.springframework.stereotype.Service;
 
+import java.io.InputStream;
+
 @Slf4j
 @Service
 public class WebdavService {
@@ -67,6 +69,10 @@ public class WebdavService {
 
     public RetrievedFileDTO retrieve(String path, WebdavSessionDTO wdsessionDTO) {
         return storageService.retrieve(path, wdsessionDTO.toSessionDTO());
+    }
+
+    public void store(String path, String mime, long size, InputStream input, WebdavSessionDTO wdsessionDTO) {
+        storageService.store(path, mime, size, input, wdsessionDTO.toSessionDTO());
     }
 
 }

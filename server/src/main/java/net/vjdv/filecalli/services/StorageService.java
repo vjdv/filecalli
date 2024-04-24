@@ -13,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.crypto.SecretKey;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -90,14 +91,29 @@ public class StorageService {
      */
 
     public void store(String filePath, MultipartFile multipartFile, SessionDTO session) {
+        try {
+            store(filePath, multipartFile.getContentType(), multipartFile.getSize(), multipartFile.getInputStream(), session);
+        } catch (IOException ex) {
+            throw new StorageException("Error getting inputStream from multipartFile", ex);
+        }
+    }
+
+    /**
+     * Stores a file in the storage
+     *
+     * @param filePath user's file path
+     * @param mime     file mime type
+     * @param size     file size
+     * @param input    file input stream
+     * @param session  user's session
+     */
+    public void store(String filePath, String mime, long size, InputStream input, SessionDTO session) {
         //Resolves dirId and fileId
         var data1 = resolveFile(filePath, session.rootDir());
         int dirId = data1.directoryId();
         int idFile = data1.id();
         //some data
         long now = Instant.now().toEpochMilli();
-        String mime = multipartFile.getContentType();
-        if (mime == null) mime = "application/octet-stream";
         //insert row if file does not exist
         if (idFile == 0) {
             String sql = "INSERT INTO files (name, mime, size, directory_id, created_at, last_modified) VALUES (?, ?, 0, ?, ?, 0)";
@@ -118,13 +134,13 @@ public class StorageService {
         SecretKey key = session.key();
         if (filePath.startsWith("/webdav/")) key = session.webdavKey();
         try {
-            CryptHelper.encrypt(multipartFile.getInputStream(), fileDestPath, key);
+            CryptHelper.encrypt(input, fileDestPath, key);
         } catch (IOException ex) {
             throw new StorageException("Error storing file", ex);
         }
         //update the file size
         String sql = "UPDATE files SET size = ?, last_modified = ? WHERE id = ?";
-        dataService.update(sql, multipartFile.getSize(), now, idFile);
+        dataService.update(sql, size, now, idFile);
     }
 
     /**
