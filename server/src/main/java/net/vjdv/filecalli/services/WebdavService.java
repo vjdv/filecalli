@@ -75,4 +75,13 @@ public class WebdavService {
         storageService.store(path, mime, size, input, wdsessionDTO.toSessionDTO());
     }
 
+    public void delete(String path, WebdavSessionDTO wdsessionDTO) {
+        if (path.endsWith("/")) {
+            path = path.substring(0, path.length() - 1);
+            storageService.deleteDirectory(path, true, wdsessionDTO.rootDir());
+        } else {
+            storageService.delete(path, wdsessionDTO.rootDir());
+        }
+    }
+
 }

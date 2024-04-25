@@ -17,7 +17,10 @@ import net.vjdv.filecalli.util.Utils;
 import org.glassfish.jaxb.runtime.marshaller.NamespacePrefixMapper;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -56,6 +59,7 @@ public class WebDavController {
     @RequestMapping(value = "/**")
     public ResponseEntity<String> handleRequest(HttpServletRequest request) {
         WebdavSessionDTO session = parseSession(request);
+        long timeStart = System.currentTimeMillis();
         String method = request.getMethod();
         String requestPath = request.getRequestURI();
         log.info("method={} requestPath={}", method, requestPath);
@@ -83,6 +87,7 @@ public class WebDavController {
                 try {
                     long size = Long.parseLong(sizeStr);
                     webdavService.store(requestPath, mime, size, request.getInputStream(), session);
+                    log.info("{} stored path {} in {}ms", session.userId(), requestPath, System.currentTimeMillis() - timeStart);
                     return ResponseEntity.created(new URI(requestPath)).build();
                 } catch (IOException ex) {
                     return ResponseEntity.badRequest().body("Error reading body");
@@ -92,8 +97,11 @@ public class WebDavController {
                     return ResponseEntity.badRequest().body("Invalid URI");
                 }
             }
-            case "DELETE":
-                break;
+            case "DELETE": {
+                webdavService.delete(requestPath, session);
+                log.info("{} deleted path {} {}ms", session.userId(), requestPath, System.currentTimeMillis() - timeStart);
+                return ResponseEntity.noContent().build();
+            }
             case "MKCOL":
                 break;
             case "COPY":
@@ -109,7 +117,7 @@ public class WebDavController {
             default:
                 break;
         }
-        return ResponseEntity.badRequest().body("Method not supported");
+        return ResponseEntity.status(501).body("Method not supported");
     }
 
     private WebdavSessionDTO parseSession(HttpServletRequest request) throws AuthException {

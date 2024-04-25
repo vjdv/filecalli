@@ -167,6 +167,62 @@ public class StorageService {
     }
 
     /**
+     * Deletes a file from the storage
+     *
+     * @param filePath user's file path
+     * @param rootDir  user's root directory
+     * @throws ResourceNotFoundException if the file does not exist
+     */
+    public void delete(String filePath, int rootDir) {
+        var data = resolveFile(filePath, rootDir);
+        if (data.id() == 0) throw new ResourceNotFoundException("File " + filePath + " does not exist");
+        Path inputFile = computeFilePath(data.id());
+        try {
+            if (Files.exists(inputFile)) Files.delete(inputFile);
+        } catch (IOException ex) {
+            throw new StorageException("Error deleting file", ex);
+        }
+        String sql = "DELETE FROM files WHERE id = ?";
+        dataService.update(sql, data.id());
+    }
+
+    /**
+     * Deletes a directory from the storage
+     *
+     * @param path               directory path
+     * @param deleteWithContents if true, deletes the directory and its contents
+     * @param rootDir            user's root directory
+     * @return number of files deleted
+     * @throws StorageException if the directory is not empty and deleteWithContents is false
+     */
+    public int deleteDirectory(String path, boolean deleteWithContents, int rootDir) {
+        if ("/".equals(path)) throw new StorageException("Cannot delete root directory");
+        int dirId = resolveDir(path, rootDir);
+        //validates if the directory is empty
+        if (!deleteWithContents) {
+            String sql = "SELECT COUNT(1) FROM directories, files WHERE directories.parent = ? OR ( files.directory_id = ? AND files.directory_id = directories.id )";
+            int count = dataService.queryOne(sql, rs -> rs.getInt(1), dirId, dirId).orElse(0);
+            if (count > 0) throw new StorageException("Directory is not empty");
+        }
+        int deletedFiles = 0;
+        //delete directories
+        String sql1 = "SELECT name FROM directories WHERE parent = ?";
+        List<String> dirs = dataService.queryList(sql1, rs -> rs.getString(1), dirId);
+        for (String dir : dirs) {
+            deletedFiles += deleteDirectory(path + "/" + dir, true, rootDir);
+        }
+        //delete files
+        String sql2 = "SELECT name FROM files WHERE directory_id = ?";
+        List<String> files = dataService.queryList(sql2, rs -> rs.getString(1), dirId);
+        for (String file : files) {
+            delete(path + "/" + file, rootDir);
+            deletedFiles++;
+        }
+        //return
+        return deletedFiles;
+    }
+
+    /**
      * Resolves the directory id from the path
      *
      * @param path    user directory path
