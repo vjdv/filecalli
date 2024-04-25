@@ -78,7 +78,7 @@ public class StorageService {
         String dirPath = path.substring(0, slashIndex + 1);
         String dirName = path.substring(slashIndex + 1);
         int parentDir = resolveDir(dirPath, session.rootDir());
-        String sql = "INSERT INTO directories (name, parent, created_at, last_modified) VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO directories (name, parent, created_at, last_modified) VALUES (?, ?, ?, ?)";
         return dataService.insertAutoincrement(sql, dirName, parentDir, now, now);
     }
 

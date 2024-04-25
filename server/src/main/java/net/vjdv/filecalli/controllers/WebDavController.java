@@ -102,8 +102,11 @@ public class WebDavController {
                 log.info("{} deleted path {} {}ms", session.userId(), requestPath, System.currentTimeMillis() - timeStart);
                 return ResponseEntity.noContent().build();
             }
-            case "MKCOL":
-                break;
+            case "MKCOL": {
+                webdavService.makeCollection(requestPath, session);
+                log.info("{} created collection {} in {}ms", session.userId(), requestPath, System.currentTimeMillis() - timeStart);
+                return ResponseEntity.created(URI.create(requestPath)).build();
+            }
             case "COPY":
                 break;
             case "MOVE":

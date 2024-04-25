@@ -84,4 +84,9 @@ public class WebdavService {
         }
     }
 
+    public void makeCollection(String path, WebdavSessionDTO wdsession) {
+        if (path.endsWith("/")) path = path.substring(0, path.length() - 1);
+        storageService.createDirectory(path, wdsession.toSessionDTO());
+    }
+
 }
