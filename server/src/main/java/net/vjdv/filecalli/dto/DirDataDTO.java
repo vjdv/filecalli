@@ -1,14 +1,12 @@
 package net.vjdv.filecalli.dto;
 
-public record FileDataDTO(
+public record DirDataDTO(
         int id,
         String name,
         String path,
-        String mime,
-        long size,
         long createdAt,
         long lastModified,
-        int directoryId
+        int parentId
 ) {
 
 }

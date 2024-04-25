@@ -33,16 +33,16 @@ public class Response {
         public ResponseBuilder() {
         }
 
-        public ResponseBuilder directory(String name, long createdAt, long lastModified) {
+        public ResponseBuilder directory(String name, String path, long createdAt, long lastModified) {
             Prop prop = new Prop(name, createdAt, lastModified);
-            href = Configuration.getInstance().getHost() + "/webdav/" + name + "/";
+            href = Configuration.getInstance().getHost() + path + "/";
             propstat = new Propstat(prop, "HTTP/1.1 200 OK");
             return this;
         }
 
-        public ResponseBuilder file(String name, String mime, long size, long createdAt, long lastModified) {
+        public ResponseBuilder file(String name, String path, String mime, long size, long createdAt, long lastModified) {
             Prop prop = new Prop(name, mime, size, createdAt, lastModified);
-            href = Configuration.getInstance().getHost() + "/webdav/" + name;
+            href = Configuration.getInstance().getHost() + path;
             propstat = new Propstat(prop, "HTTP/1.1 200 OK");
             return this;
         }

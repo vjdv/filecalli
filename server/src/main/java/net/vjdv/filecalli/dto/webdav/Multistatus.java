@@ -36,14 +36,14 @@ public class Multistatus {
         public MultistatusBuilder() {
         }
 
-        public MultistatusBuilder directory(String name, long createdAt, long lastModified) {
-            var response = new Response.ResponseBuilder().directory(name, createdAt, lastModified).build();
+        public MultistatusBuilder directory(String name, String path, long createdAt, long lastModified) {
+            var response = new Response.ResponseBuilder().directory(name, path, createdAt, lastModified).build();
             responses.add(response);
             return MultistatusBuilder.this;
         }
 
-        public MultistatusBuilder file(String name, String mime, long size, long createdAt, long lastModified) {
-            var response = new Response.ResponseBuilder().file(name, mime, size, createdAt, lastModified).build();
+        public MultistatusBuilder file(String name, String path, String mime, long size, long createdAt, long lastModified) {
+            var response = new Response.ResponseBuilder().file(name, path, mime, size, createdAt, lastModified).build();
             responses.add(response);
             return MultistatusBuilder.this;
         }

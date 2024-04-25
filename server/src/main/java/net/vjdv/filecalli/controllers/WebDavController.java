@@ -10,6 +10,7 @@ import net.vjdv.filecalli.dto.webdav.Multistatus;
 import net.vjdv.filecalli.exceptions.AuthException;
 import net.vjdv.filecalli.exceptions.LoginException;
 import net.vjdv.filecalli.exceptions.ResourceNotFoundException;
+import net.vjdv.filecalli.exceptions.StorageException;
 import net.vjdv.filecalli.services.SessionService;
 import net.vjdv.filecalli.services.WebdavService;
 import net.vjdv.filecalli.util.TempFileSystemResource;
@@ -67,18 +68,13 @@ public class WebDavController {
         request.getParameterMap().forEach((k, v) -> log.info("param {}: {}", k, String.join(", ", v)));
         //prints all headers
         request.getHeaderNames().asIterator().forEachRemaining(name -> log.info("{}: {}", name, request.getHeader(name)));
-        //prints body
-        /*try {
-            request.getReader().lines().forEach(log::info);
-        } catch (Exception e) {
-            log.error("Error reading body", e);
-        }*/
         //process by method
         switch (method) {
             case "PROPFIND": {
                 try {
                     var multistatus = webdavService.propfind(requestPath, session.rootDir());
                     String xmlResponse = marshalToXml(multistatus);
+                    log.info(xmlResponse);
                     return ResponseEntity.status(207).contentType(MediaType.APPLICATION_XML).body(xmlResponse);
                 } catch (ResourceNotFoundException ex) {
                     return ResponseEntity.notFound().build();
@@ -110,20 +106,26 @@ public class WebDavController {
                 log.info("{} created collection {} in {}ms", session.userId(), requestPath, System.currentTimeMillis() - timeStart);
                 return ResponseEntity.created(URI.create(requestPath)).build();
             }
+            case "MOVE": {
+                String destination = request.getHeader("Destination");
+                if (destination == null) return ResponseEntity.badRequest().body("Destination header required");
+                if (destination.startsWith("http")) {
+                    int index = destination.indexOf("/webdav/");
+                    if (index == -1) return ResponseEntity.badRequest().body("Invalid destination");
+                    destination = destination.substring(index);
+                }
+                webdavService.move(requestPath, destination, session);
+                log.info("{} moved path {} to {} in {}ms", session.userId(), requestPath, destination, System.currentTimeMillis() - timeStart);
+                return ResponseEntity.noContent().build();
+            }
             case "COPY":
-                break;
-            case "MOVE":
-                break;
             case "OPTIONS":
-                break;
             case "LOCK":
-                break;
             case "UNLOCK":
-                break;
+                return ResponseEntity.status(501).body("Method " + method + " not supported");
             default:
-                break;
+                return ResponseEntity.status(501).body("Method not supported");
         }
-        return ResponseEntity.status(501).body("Method not supported");
     }
 
     private WebdavSessionDTO parseSession(HttpServletRequest request) throws AuthException {
@@ -150,6 +152,12 @@ public class WebDavController {
             throw new AuthException(403, "Forbidden");
         }
         return session;
+    }
+
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<String> handleStorageException(StorageException ex) {
+        log.warn("Storage error", ex);
+        return ResponseEntity.status(500).body(ex.getMessage());
     }
 
     @ExceptionHandler(AuthException.class)

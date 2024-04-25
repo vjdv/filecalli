@@ -1,6 +1,7 @@
 package net.vjdv.filecalli.services;
 
 import lombok.extern.slf4j.Slf4j;
+import net.vjdv.filecalli.dto.DirDataDTO;
 import net.vjdv.filecalli.dto.FileDataDTO;
 import net.vjdv.filecalli.dto.RetrievedFileDTO;
 import net.vjdv.filecalli.dto.SessionDTO;
@@ -42,7 +43,7 @@ public class StorageService {
      * @return list of directories and files
      */
     public List<ListedResource> list(String path, int rootDir) {
-        int directoryId = resolveDir(path, rootDir);
+        int directoryId = resolveDir(path, rootDir, true).id();
         // directories
         String sql1 = "SELECT id, name FROM directories WHERE parent = ?";
         List<ListedResource> dirs = dataService.queryList(sql1, rs -> new ListedResource(rs.getString(2), true, false, 0, 0, 0), directoryId);
@@ -74,12 +75,12 @@ public class StorageService {
         if (!path.startsWith("/")) throw new StorageException("Path must start with /");
         if (path.endsWith("/")) throw new StorageException("Directory name must not end with /");
         long now = Instant.now().toEpochMilli();
-        int slashIndex = path.lastIndexOf("/");
-        String dirPath = path.substring(0, slashIndex + 1);
-        String dirName = path.substring(slashIndex + 1);
-        int parentDir = resolveDir(dirPath, session.rootDir());
+        var dataDir = resolveDir(path, session.rootDir(), false);
+        if (dataDir.id() != 0) {
+            throw new StorageException("Directory already exists");
+        }
         String sql = "INSERT INTO directories (name, parent, created_at, last_modified) VALUES (?, ?, ?, ?)";
-        return dataService.insertAutoincrement(sql, dirName, parentDir, now, now);
+        return dataService.insertAutoincrement(sql, dataDir.name(), dataDir.parentId(), now, now);
     }
 
     /**
@@ -197,7 +198,7 @@ public class StorageService {
      */
     public int deleteDirectory(String path, boolean deleteWithContents, int rootDir) {
         if ("/".equals(path)) throw new StorageException("Cannot delete root directory");
-        int dirId = resolveDir(path, rootDir);
+        int dirId = resolveDir(path, rootDir, true).id();
         //validates if the directory is empty
         if (!deleteWithContents) {
             String sql = "SELECT COUNT(1) FROM directories, files WHERE directories.parent = ? OR ( files.directory_id = ? AND files.directory_id = directories.id )";
@@ -226,6 +227,39 @@ public class StorageService {
     }
 
     /**
+     * Moves a file to a new location
+     *
+     * @param src     source file path
+     * @param dest    destination file path
+     * @param rootDir user root directory
+     */
+    public void moveFile(String src, String dest, int rootDir) {
+        var srcData = resolveFile(src, rootDir);
+        if (srcData.id() == 0) throw new ResourceNotFoundException("File " + src + " does not exist");
+        var destData = resolveFile(dest, rootDir);
+        if (destData.id() != 0) throw new StorageException("File " + dest + " already exists");
+        //update sql
+        String sql = "UPDATE files SET directory_id = ?, name = ? WHERE id = ?";
+        dataService.update(sql, destData.directoryId(), destData.name(), srcData.id());
+    }
+
+    /**
+     * Moves a directory to a new location
+     *
+     * @param src     source directory path
+     * @param dest    destination directory path
+     * @param rootDir user root directory
+     */
+    public void moveDirectory(String src, String dest, int rootDir) {
+        var srcData = resolveDir(src, rootDir, true);
+        var destData = resolveDir(dest, rootDir, false);
+        if (destData.id() != 0) throw new StorageException("Directory " + dest + " already exists");
+        //update sql
+        String sql = "UPDATE directories SET parent = ?, name = ? WHERE id = ?";
+        dataService.update(sql, destData.parentId(), destData.name(), srcData.id());
+    }
+
+    /**
      * Resolves the directory id from the path
      *
      * @param path    user directory path
@@ -233,18 +267,41 @@ public class StorageService {
      * @return directory id
      * @throws ResourceNotFoundException if the path does not exist
      */
-    protected int resolveDir(String path, int rootDir) {
-        if ("/".equals(path)) return rootDir;
+    protected DirDataDTO resolveDir(String path, int rootDir, boolean mustExists) {
+        //root directory
+        String sql = "SELECT created_at, last_modified FROM directories WHERE id = ?";
+        var dirData = dataService.queryOne(sql, rs -> {
+            long createdAt = rs.getLong(1);
+            long lastModified = rs.getLong(2);
+            return new DirDataDTO(rootDir, "/", "/", createdAt, lastModified, 0);
+        }, rootDir).orElseThrow(() -> new ResourceNotFoundException("Root directory not found"));
+        if ("/".equals(path)) return dirData;
+        //validation
         if (!path.startsWith("/")) throw new ResourceNotFoundException("Path must start with /");
+        if (path.endsWith("/")) throw new ResourceNotFoundException("Directory name must not end with /");
+        //starts resolving
         String[] paths = path.substring(1).split("/");
-        int lastDir = 0;
-        for (int i = 0; i < paths.length; i++) {
-            if ("".equals(paths[i])) throw new ResourceNotFoundException("Invalid path");
-            String sql = "SELECT id FROM directories WHERE name = ? AND parent = ?";
-            int parent = i == 0 ? rootDir : lastDir;
-            lastDir = dataService.queryOne(sql, rs -> rs.getInt(1), paths[i], parent).orElseThrow(() -> new ResourceNotFoundException("Path " + path + " not found"));
+        StringBuilder resolvedPath = new StringBuilder();
+        for (String name : paths) {
+            if ("".equals(name)) throw new ResourceNotFoundException("Invalid path");
+            resolvedPath.append("/").append(name);
+            String sql2 = "SELECT id, created_at, last_modified FROM directories WHERE name = ? AND parent = ?";
+            int lastDir = dirData.id();
+            dirData = dataService.queryOne(sql2, rs -> {
+                int id = rs.getInt(1);
+                long createdAt = rs.getLong(2);
+                long lastModified = rs.getLong(3);
+                return new DirDataDTO(id, name, resolvedPath.toString(), createdAt, lastModified, lastDir);
+            }, name, lastDir).orElse(new DirDataDTO(0, name, resolvedPath.toString(), 0, 0, lastDir));
+            if (dirData.id() == 0) break;
         }
-        return lastDir;
+        if (!dirData.path().equals(path)) {
+            throw new ResourceNotFoundException("Some parent of " + path + " does not exist");
+        }
+        if (mustExists && dirData.id() == 0) {
+            throw new ResourceNotFoundException("Directory " + path + " does not exist");
+        }
+        return dirData;
     }
 
     /**
@@ -259,9 +316,9 @@ public class StorageService {
         if ("/".equals(path)) throw new ResourceNotFoundException("Invalid file path");
         if (!path.startsWith("/")) throw new ResourceNotFoundException("Path must start with /");
         int slashIndex = path.lastIndexOf("/");
-        String dirPath = path.substring(0, slashIndex + 1);
+        String dirPath = path.substring(0, slashIndex);
         String fileName = path.substring(slashIndex + 1);
-        int dirId = resolveDir(dirPath, rootDir);
+        var dirData = resolveDir(dirPath, rootDir, true);
         String sql = "SELECT id, name, mime, size, created_at, last_modified FROM files WHERE name = ? AND directory_id = ?";
         var fileData = dataService.queryOne(sql, rs -> {
             int id = rs.getInt(1);
@@ -270,9 +327,9 @@ public class StorageService {
             long size = rs.getLong(4);
             long createdAt = rs.getLong(5);
             long lastModified = rs.getLong(6);
-            return new FileDataDTO(id, name, mime, size, createdAt, lastModified, dirId);
-        }, fileName, dirId);
-        return fileData.orElseGet(() -> new FileDataDTO(0, fileName, "", 0, 0, 0, dirId));
+            return new FileDataDTO(id, name, dirData.path() + "/" + name, mime, size, createdAt, lastModified, dirData.id());
+        }, fileName, dirData.id());
+        return fileData.orElseGet(() -> new FileDataDTO(0, fileName, dirData.path() + "/" + fileName, "", 0, 0, 0, dirData.id()));
     }
 
     /**
