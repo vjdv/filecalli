@@ -218,6 +218,9 @@ public class StorageService {
             delete(path + "/" + file, rootDir);
             deletedFiles++;
         }
+        //delete directory
+        String sql3 = "DELETE FROM directories WHERE id = ?";
+        dataService.update(sql3, dirId);
         //return
         return deletedFiles;
     }

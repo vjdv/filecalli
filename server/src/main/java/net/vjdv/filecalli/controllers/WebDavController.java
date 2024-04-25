@@ -76,10 +76,13 @@ public class WebDavController {
         //process by method
         switch (method) {
             case "PROPFIND": {
-                var multistatus = webdavService.propfind(requestPath, session.rootDir());
-                String xmlResponse = marshalToXml(multistatus);
-                log.info("xmlResponse={}", xmlResponse);
-                return ResponseEntity.status(207).contentType(MediaType.APPLICATION_XML).body(xmlResponse);
+                try {
+                    var multistatus = webdavService.propfind(requestPath, session.rootDir());
+                    String xmlResponse = marshalToXml(multistatus);
+                    return ResponseEntity.status(207).contentType(MediaType.APPLICATION_XML).body(xmlResponse);
+                } catch (ResourceNotFoundException ex) {
+                    return ResponseEntity.notFound().build();
+                }
             }
             case "PUT": {
                 String mime = request.getHeader("Content-Type");
