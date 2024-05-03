@@ -47,6 +47,7 @@ public class WebDavController {
         String requestPath = request.getRequestURI();
         try {
             var datafile = webdavService.retrieve(requestPath, session);
+            log.info("{} retrieved path {}", session.userId(), requestPath);
             return ResponseEntity
                     .ok()
                     .header("Content-Type", datafile.mimeType())
@@ -63,18 +64,14 @@ public class WebDavController {
         long timeStart = System.currentTimeMillis();
         String method = request.getMethod();
         String requestPath = request.getRequestURI();
-        log.info("method={} requestPath={}", method, requestPath);
-        //prints parameters
-        request.getParameterMap().forEach((k, v) -> log.info("param {}: {}", k, String.join(", ", v)));
-        //prints all headers
-        request.getHeaderNames().asIterator().forEachRemaining(name -> log.info("{}: {}", name, request.getHeader(name)));
+        log.debug("method={} requestPath={}", method, requestPath);
         //process by method
         switch (method) {
             case "PROPFIND": {
                 try {
                     var multistatus = webdavService.propfind(requestPath, session.rootDir());
                     String xmlResponse = marshalToXml(multistatus);
-                    log.info(xmlResponse);
+                    log.info("{} propfind {} in {}ms", session.userId(), requestPath, System.currentTimeMillis() - timeStart);
                     return ResponseEntity.status(207).contentType(MediaType.APPLICATION_XML).body(xmlResponse);
                 } catch (ResourceNotFoundException ex) {
                     return ResponseEntity.notFound().build();
