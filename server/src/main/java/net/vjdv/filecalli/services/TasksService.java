@@ -1,5 +1,6 @@
 package net.vjdv.filecalli.services;
 
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import net.vjdv.filecalli.util.Configuration;
 import org.springframework.stereotype.Service;
@@ -21,8 +22,9 @@ public class TasksService {
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
     private final Configuration config;
 
-    public TasksService(Configuration configuration) {
+    public TasksService(DataService dataService, Configuration configuration) {
         this.config = configuration;
+        executor.scheduleWithFixedDelay(dataService::updateEncryptedDb, 5, 5, TimeUnit.MINUTES);
     }
 
     /**
@@ -40,6 +42,11 @@ public class TasksService {
             }
         }, 10, TimeUnit.MINUTES);
         return file;
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        executor.shutdown();
     }
 
 }

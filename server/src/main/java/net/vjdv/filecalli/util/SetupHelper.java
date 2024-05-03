@@ -113,6 +113,19 @@ public class SetupHelper {
             //enable webdav
             if (user.webdav()) {
                 enableWebdav(conn, user.id(), directoryId);
+                //setup tokens
+                for (var token : user.webdavTokens()) {
+                    var sql4 = "INSERT INTO webdav_tokens (token, user_id, path, created_at) VALUES (?, ?, ?, ?)";
+                    try (var ps = conn.prepareStatement(sql4)) {
+                        ps.setString(1, token.token());
+                        ps.setString(2, user.id());
+                        ps.setString(3, token.path());
+                        ps.setLong(4, Instant.now().toEpochMilli());
+                        ps.execute();
+                    } catch (SQLException ex) {
+                        throw new DataException("Error creating webdav token", ex);
+                    }
+                }
             }
         }
     }

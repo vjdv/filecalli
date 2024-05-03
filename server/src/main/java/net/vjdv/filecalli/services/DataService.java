@@ -8,9 +8,12 @@ import net.vjdv.filecalli.dto.ResultSetWrapper;
 import net.vjdv.filecalli.dto.SetupDTO;
 import net.vjdv.filecalli.exceptions.DataException;
 import net.vjdv.filecalli.util.Configuration;
+import net.vjdv.filecalli.util.CryptHelper;
 import net.vjdv.filecalli.util.SetupHelper;
 import org.springframework.stereotype.Service;
 
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,14 +33,27 @@ import java.util.function.Function;
 public class DataService {
 
     private final Connection connection;
+    private final SecretKey key;
+    private final Path encryptedDb;
+    private final Path dbPath;
 
     public DataService(Configuration configuration) {
         Path dataPath = configuration.getDataPath();
         Path setupPath = dataPath.resolve("setup.yml");
-        Path dbPath = dataPath.resolve("db.sqlite");
-        log.info("sqlite path is {}", dbPath);
-        if (!Files.exists(dbPath) && !Files.exists(setupPath)) {
+        var keyBytes = CryptHelper.hashBytes(configuration.getSalt());
+        key = new SecretKeySpec(keyBytes, "AES");
+        encryptedDb = dataPath.resolve("db");
+        dbPath = configuration.getTempPath().resolve("db.sqlite");
+        log.info("sqlite path is {}", encryptedDb);
+        if (!Files.exists(encryptedDb) && !Files.exists(setupPath)) {
             throw new DataException("Please run setup first.");
+        }
+        if (Files.exists(encryptedDb)) {
+            try (var fis = Files.newInputStream(encryptedDb)) {
+                CryptHelper.decrypt(fis, dbPath, key);
+            } catch (IOException ex) {
+                throw new DataException("Error opening database", ex);
+            }
         }
         String url = "jdbc:sqlite:" + dbPath.toAbsolutePath();
         try {
@@ -197,6 +213,14 @@ public class DataService {
         }
     }
 
+    public void updateEncryptedDb() {
+        try (var fis = Files.newInputStream(dbPath)) {
+            CryptHelper.encrypt(fis, encryptedDb, key);
+        } catch (IOException ex) {
+            throw new DataException("Error updating database", ex);
+        }
+    }
+
     @PreDestroy
     public void close() {
         log.info("Closing database");
@@ -204,6 +228,12 @@ public class DataService {
             connection.close();
         } catch (SQLException ex) {
             log.error("Error closing db file", ex);
+        }
+        updateEncryptedDb();
+        try {
+            Files.delete(dbPath);
+        } catch (IOException ex) {
+            log.error("Error deleting db file", ex);
         }
     }
 
