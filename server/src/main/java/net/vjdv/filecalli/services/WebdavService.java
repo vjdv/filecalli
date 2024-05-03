@@ -90,4 +90,25 @@ public class WebdavService {
         }
     }
 
+    public void copy(String from, String to, WebdavSessionDTO wdsession) {
+        if (!from.startsWith("/webdav/")) throw new StorageException("invalid source path");
+        if (!to.startsWith("/webdav/")) throw new StorageException("invalid destination path");
+        var resolvedDirSrc = storageService.resolveDir(from, wdsession.rootDir(), false);
+        var resolvedDirDst = storageService.resolveDir(to, wdsession.rootDir(), false);
+        var resolvedFileSrc = storageService.resolveFile(from, wdsession.rootDir());
+        var resolvedFileDst = storageService.resolveFile(to, wdsession.rootDir());
+        if (resolvedDirSrc.id() != 0 && resolvedFileDst.id() != 0)
+            throw new StorageException("cannot copy directory to file");
+        if (resolvedFileSrc.id() != 0 && resolvedDirDst.id() != 0)
+            throw new StorageException("cannot copy file to directory");
+        if (resolvedDirSrc.id() == 0 && resolvedFileSrc.id() == 0)
+            throw new ResourceNotFoundException("source path not found");
+        if (resolvedDirSrc.id() != 0 && resolvedDirDst.id() != 0)
+            throw new StorageException("destination path already exists");
+        if (resolvedFileSrc.id() != 0 && resolvedFileDst.id() != 0)
+            throw new StorageException("destination path already exists");
+        if (resolvedDirSrc.id() != 0) storageService.copyDirectory(from, to, wdsession.toSessionDTO());
+        if (resolvedFileSrc.id() != 0) storageService.copyFile(from, to, wdsession.toSessionDTO());
+    }
+
 }

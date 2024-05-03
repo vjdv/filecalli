@@ -127,7 +127,7 @@ public class StorageService {
         if (!Files.exists(parent)) {
             try {
                 Files.createDirectories(parent);
-            } catch (Exception ex) {
+            } catch (IOException ex) {
                 throw new StorageException("Error creating directories", ex);
             }
         }
@@ -257,6 +257,77 @@ public class StorageService {
         //update sql
         String sql = "UPDATE directories SET parent = ?, name = ? WHERE id = ?";
         dataService.update(sql, destData.parentId(), destData.name(), srcData.id());
+    }
+
+    public void copyFile(String src, String dest, SessionDTO session) {
+        var srcData = resolveFile(src, session.rootDir());
+        if (srcData.id() == 0) throw new ResourceNotFoundException("File " + src + " does not exist");
+        var destData = resolveFile(dest, session.rootDir());
+        if (destData.id() != 0) throw new StorageException("File " + dest + " already exists");
+        //insert
+        long now = Instant.now().toEpochMilli();
+        String sql = "INSERT INTO files (name, mime, size, directory_id, created_at, last_modified) VALUES (?, ?, 0, ?, ?, 0)";
+        int idFile = dataService.insertAutoincrement(sql, destData.name(), srcData.mime(), destData.directoryId(), now);
+        log.info("Storing copy file {} id={}", dest, idFile);
+        Path fileDestPath = computeFilePath(idFile);
+        Path parent = fileDestPath.getParent();
+        //parent directory must exist
+        if (!Files.exists(parent)) {
+            try {
+                Files.createDirectories(parent);
+            } catch (IOException ex) {
+                throw new StorageException("Error creating directories", ex);
+            }
+        }
+        //copy the file
+        Path fileSrcPath = computeFilePath(srcData.id());
+        if ((src.startsWith("/webdav/") && dest.startsWith("/webdav/")) || (!src.startsWith("/webdav/") && !dest.startsWith("/webdav/"))) {
+            try {
+                Files.copy(fileSrcPath, fileDestPath);
+            } catch (IOException ex) {
+                throw new StorageException("Error copying file", ex);
+            }
+        } else {
+            SecretKey decodeKey = session.key();
+            SecretKey encodeKey = session.key();
+            if (src.startsWith("/webdav/")) decodeKey = session.webdavKey();
+            if (dest.startsWith("/webdav/")) encodeKey = session.webdavKey();
+            try (var inputStream = Files.newInputStream(fileSrcPath)) {
+                var tempPath = tasksService.getTempFile();
+                CryptHelper.decrypt(inputStream, tempPath, decodeKey);
+                try (var decodedStream = Files.newInputStream(tempPath)) {
+                    CryptHelper.encrypt(decodedStream, fileDestPath, encodeKey);
+                }
+            } catch (IOException ex) {
+                throw new StorageException("Error copying file", ex);
+            }
+        }
+        //update the file size
+        String sql2 = "UPDATE files SET size = ?, last_modified = ? WHERE id = ?";
+        int updated = dataService.update(sql2, srcData.size(), now, idFile);
+        if (updated != 1) throw new StorageException("Error updating file size id=" + idFile + " updated=" + updated);
+    }
+
+    public void copyDirectory(String src, String dest, SessionDTO session) {
+        var srcData = resolveDir(src, session.rootDir(), true);
+        var destData = resolveDir(dest, session.rootDir(), false);
+        if (destData.id() != 0) throw new StorageException("Directory " + dest + " already exists");
+        //insert
+        long now = Instant.now().toEpochMilli();
+        String sql = "INSERT INTO directories (name, parent, created_at, last_modified) VALUES (?, ?, ?, ?)";
+        dataService.insertAutoincrement(sql, destData.name(), destData.parentId(), now, now);
+        log.info("Copying directory {} to {}", src, dest);
+        //copy the directory
+        String sql2 = "SELECT name FROM directories WHERE parent = ?";
+        List<String> dirs = dataService.queryList(sql2, rs -> rs.getString(1), srcData.id());
+        for (String dir : dirs) {
+            copyDirectory(src + "/" + dir, dest + "/" + dir, session);
+        }
+        String sql3 = "SELECT name FROM files WHERE directory_id = ?";
+        List<String> files = dataService.queryList(sql3, rs -> rs.getString(1), srcData.id());
+        for (String file : files) {
+            copyFile(src + "/" + file, dest + "/" + file, session);
+        }
     }
 
     /**

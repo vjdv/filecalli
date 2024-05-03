@@ -118,10 +118,26 @@ public class WebDavController {
                 log.info("{} moved path {} to {} in {}ms", session.userId(), requestPath, destination, System.currentTimeMillis() - timeStart);
                 return ResponseEntity.noContent().build();
             }
-            case "COPY":
-            case "OPTIONS":
+            case "COPY": {
+                String destination = request.getHeader("Destination");
+                if (destination == null) return ResponseEntity.badRequest().body("Destination header required");
+                if (destination.startsWith("http")) {
+                    int index = destination.indexOf("/webdav/");
+                    if (index == -1) return ResponseEntity.badRequest().body("Invalid destination");
+                    destination = destination.substring(index);
+                }
+                webdavService.copy(requestPath, destination, session);
+                log.info("{} copied path {} to {} in {}ms", session.userId(), requestPath, destination, System.currentTimeMillis() - timeStart);
+                return ResponseEntity.created(URI.create(destination)).build();
+            }
+            case "OPTIONS": {
+                return ResponseEntity.ok()
+                        .header("Allow", "OPTIONS, GET, HEAD, POST, PUT, DELETE, COPY, MOVE, MKCOL, PROPFIND")
+                        .build();
+            }
             case "LOCK":
             case "UNLOCK":
+            case "PROPPATCH":
                 return ResponseEntity.status(501).body("Method " + method + " not supported");
             default:
                 return ResponseEntity.status(501).body("Method not supported");
