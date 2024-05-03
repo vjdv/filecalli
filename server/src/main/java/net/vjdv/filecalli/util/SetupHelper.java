@@ -2,6 +2,7 @@ package net.vjdv.filecalli.util;
 
 import lombok.extern.slf4j.Slf4j;
 import net.vjdv.filecalli.dto.SetupUserDTO;
+import net.vjdv.filecalli.enums.Parameter;
 import net.vjdv.filecalli.exceptions.DataException;
 
 import java.sql.Connection;
@@ -51,6 +52,20 @@ public class SetupHelper {
                     created_at INTEGER NOT NULL,
                     FOREIGN KEY (user_id) REFERENCES users (id)
                 )""");
+        createTable(conn, "parameters", """
+                CREATE TABLE parameters (
+                    ikey INTEGER PRIMARY KEY,
+                    value TEXT NOT NULL
+                )""");
+        //parameters
+        String sql = "INSERT INTO parameters (ikey, value) VALUES (?, ?)";
+        try (var ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, Parameter.DATA_VERSION.getValue());
+            ps.setString(2, "1");
+            ps.execute();
+        } catch (SQLException ex) {
+            throw new DataException("Error creating parameters", ex);
+        }
     }
 
     private static void createTable(Connection conn, String name, String sql) {
