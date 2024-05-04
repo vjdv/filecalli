@@ -1,0 +1,61 @@
+name: Genera paquete ZIP
+
+on:
+  release:
+    types: [released]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    permissions: write-all
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      - id: pomversion
+        name: Recovers pom version
+        run: |
+          OUTPUT=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "VERSION=${OUTPUT}" >> "$GITHUB_OUTPUT"
+        working-directory: ./server
+      - name: Build with Maven
+        run: mvn -B package --file pom.xml
+        working-directory: ./server
+      - name: upload jar asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./target/filecalli-${{ steps.pomversion.outputs.VERSION }}.jar
+          asset_name: filecalli-${{ steps.pomversion.outputs.VERSION }}.jar
+          asset_content_type: application/java-archive
+        working-directory: ./server
+      - name: Renames jar
+        run: mv target/filecalli-*.jar target/filecalli.jar
+        working-directory: ./server
+      - name: Log in to the Container registry
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@96383f45573cb7f253c731d3b3ab81c87ef81934
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09
+        with:
+          context: "./server"
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

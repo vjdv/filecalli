@@ -15,7 +15,7 @@ Keep the privacy of your users, as their files are encrypted.
 Pull the docker image and run it with the following command:
 
 ```bash
-docker run -d -p 8080:8080 -v /your/data/dir:/data --mount type=tmpfs,destination=/tmp,tmpfs-size=512m filecalli/filecalli
+docker run -d -p 8080:8080 -v /your/data/dir:/data --mount type=tmpfs,destination=/app/temp,tmpfs-size=512m ghcr.io/vjdv/filecalli:0.0.1
 ```
 
 ### Setup
@@ -53,7 +53,7 @@ The password is only know at runtime while the session is active.
 Example:
 
 ```bash
-docker run -e host=http://example.com -e contextpath=/filecalli -e salt=mysecret fillcalli/filecalli
+docker run -e host=http://example.com -e contextpath=/filecalli -e salt=mysecret ghcr.io/vjdv/filecalli:0.0.1
 ```
 
 ## Webdav
