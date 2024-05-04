@@ -6,6 +6,7 @@ import net.vjdv.filecalli.dto.WebdavSessionDTO;
 import net.vjdv.filecalli.enums.Role;
 import net.vjdv.filecalli.exceptions.LoginException;
 import net.vjdv.filecalli.exceptions.ServiceException;
+import net.vjdv.filecalli.util.Configuration;
 import net.vjdv.filecalli.util.CryptHelper;
 import org.springframework.stereotype.Service;
 
@@ -106,7 +107,7 @@ public class SessionService {
         //query from db
         String sql = "SELECT w.path, u.webdav_suffix, u.root_directory, u.role FROM webdav_tokens W INNER JOIN users U ON w.user_id = u.id WHERE w.token = ? AND u.id = ?";
         var session = dataService.queryOne(sql, rs -> {
-            String path = "/webdav" + rs.getString(1);
+            String path = Configuration.getInstance().getContextPath() + "/webdav" + rs.getString(1);
             String suffix = rs.getString(2);
             int rootDir = rs.getInt(3);
             String roleStr = rs.getString(4);

@@ -12,6 +12,7 @@ import java.nio.file.Paths;
 public class Configuration {
     private static Configuration instance = null;
     private final String host;
+    private final String contextPath;
     private final Path dataPath;
     private final Path tempPath;
     private final String salt;
@@ -19,6 +20,8 @@ public class Configuration {
     public Configuration(Environment env) {
         //host where the server is running
         host = env.getProperty("host", "http://localhost:8080");
+        //context path or base path
+        contextPath = env.getProperty("contextpath", "");
         //path where all encrypted files are stored
         dataPath = Paths.get(env.getProperty("datapath", "./data"));
         //path where temporary files are stored

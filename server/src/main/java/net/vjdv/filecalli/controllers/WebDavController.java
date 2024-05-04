@@ -14,6 +14,7 @@ import net.vjdv.filecalli.exceptions.ResourceNotFoundException;
 import net.vjdv.filecalli.exceptions.StorageException;
 import net.vjdv.filecalli.services.SessionService;
 import net.vjdv.filecalli.services.WebdavService;
+import net.vjdv.filecalli.util.Configuration;
 import net.vjdv.filecalli.util.TempFileSystemResource;
 import net.vjdv.filecalli.util.Utils;
 import org.glassfish.jaxb.runtime.marshaller.NamespacePrefixMapper;
@@ -46,6 +47,9 @@ public class WebDavController {
     public ResponseEntity<TempFileSystemResource> getResource(HttpServletRequest request) {
         WebdavSessionDTO session = parseSession(request);
         String requestPath = request.getRequestURI();
+        if (!Configuration.getInstance().getContextPath().isEmpty()) {
+            requestPath = requestPath.substring(Configuration.getInstance().getContextPath().length());
+        }
         try {
             var datafile = webdavService.retrieve(requestPath, session);
             log.info("{} retrieved path {}", session.userId(), requestPath);
@@ -65,6 +69,9 @@ public class WebDavController {
         long timeStart = System.currentTimeMillis();
         String method = request.getMethod();
         String requestPath = request.getRequestURI();
+        if (!Configuration.getInstance().getContextPath().isEmpty()) {
+            requestPath = requestPath.substring(Configuration.getInstance().getContextPath().length());
+        }
         log.debug("method={} requestPath={}", method, requestPath);
         //process by method
         switch (method) {
