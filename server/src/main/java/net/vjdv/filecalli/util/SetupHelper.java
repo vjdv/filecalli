@@ -29,6 +29,7 @@ public class SetupHelper {
                     id TEXT PRIMARY KEY,
                     name TEXT NOT NULL,
                     password BLOB NOT NULL,
+                    role TEXT NOT NULL,
                     root_directory INTEGER NOT NULL,
                     webdav_suffix TEXT NULL,
                     FOREIGN KEY (root_directory) REFERENCES directories (id)
@@ -78,7 +79,7 @@ public class SetupHelper {
 
     public static void setupUsers(Connection conn, SetupUserDTO[] users) {
         log.info("Creating users");
-        var sql1 = "INSERT INTO users (id, name, password, root_directory) VALUES (?, ?, ?, 99999)";
+        var sql1 = "INSERT INTO users (id, name, password, role, root_directory) VALUES (?, ?, ?, ?, 99999)";
         var sql2 = "INSERT INTO directories (name, created_at, last_modified) VALUES ('/', ?, ?)";
         var sql3 = "UPDATE users SET root_directory = ? WHERE id = ?";
         for (SetupUserDTO user : users) {
@@ -87,6 +88,7 @@ public class SetupHelper {
                 ps.setString(1, user.id());
                 ps.setString(2, user.name());
                 ps.setBytes(3, CryptHelper.hashBytes(user.pass()));
+                ps.setString(4, user.role());
                 ps.execute();
             } catch (SQLException ex) {
                 throw new DataException("Error creating user", ex);

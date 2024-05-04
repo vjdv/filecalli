@@ -7,6 +7,7 @@ import jakarta.xml.bind.Marshaller;
 import lombok.extern.slf4j.Slf4j;
 import net.vjdv.filecalli.dto.WebdavSessionDTO;
 import net.vjdv.filecalli.dto.webdav.Multistatus;
+import net.vjdv.filecalli.enums.Role;
 import net.vjdv.filecalli.exceptions.AuthException;
 import net.vjdv.filecalli.exceptions.LoginException;
 import net.vjdv.filecalli.exceptions.ResourceNotFoundException;
@@ -78,6 +79,7 @@ public class WebDavController {
                 }
             }
             case "PUT": {
+                if (session.role() == Role.GUEST) return ResponseEntity.status(403).body("Forbidden");
                 String mime = request.getHeader("Content-Type");
                 String sizeStr = request.getHeader("Content-Length");
                 try {
@@ -94,16 +96,19 @@ public class WebDavController {
                 }
             }
             case "DELETE": {
+                if (session.role() == Role.GUEST) return ResponseEntity.status(403).body("Forbidden");
                 webdavService.delete(requestPath, session);
                 log.info("{} deleted path {} {}ms", session.userId(), requestPath, System.currentTimeMillis() - timeStart);
                 return ResponseEntity.noContent().build();
             }
             case "MKCOL": {
+                if (session.role() == Role.GUEST) return ResponseEntity.status(403).body("Forbidden");
                 webdavService.makeCollection(requestPath, session);
                 log.info("{} created collection {} in {}ms", session.userId(), requestPath, System.currentTimeMillis() - timeStart);
                 return ResponseEntity.created(URI.create(requestPath)).build();
             }
             case "MOVE": {
+                if (session.role() == Role.GUEST) return ResponseEntity.status(403).body("Forbidden");
                 String destination = request.getHeader("Destination");
                 if (destination == null) return ResponseEntity.badRequest().body("Destination header required");
                 if (destination.startsWith("http")) {
@@ -116,6 +121,7 @@ public class WebDavController {
                 return ResponseEntity.noContent().build();
             }
             case "COPY": {
+                if (session.role() == Role.GUEST) return ResponseEntity.status(403).body("Forbidden");
                 String destination = request.getHeader("Destination");
                 if (destination == null) return ResponseEntity.badRequest().body("Destination header required");
                 if (destination.startsWith("http")) {

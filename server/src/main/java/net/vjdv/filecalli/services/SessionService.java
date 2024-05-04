@@ -3,6 +3,7 @@ package net.vjdv.filecalli.services;
 import lombok.extern.slf4j.Slf4j;
 import net.vjdv.filecalli.dto.SessionDTO;
 import net.vjdv.filecalli.dto.WebdavSessionDTO;
+import net.vjdv.filecalli.enums.Role;
 import net.vjdv.filecalli.exceptions.LoginException;
 import net.vjdv.filecalli.exceptions.ServiceException;
 import net.vjdv.filecalli.util.CryptHelper;
@@ -36,7 +37,7 @@ public class SessionService {
      * @throws LoginException if the user or password are invalid
      */
     public String login(String userId, String pass) {
-        String sql = "SELECT id, name, root_directory, webdav_suffix FROM users WHERE id = ? AND password = ?";
+        String sql = "SELECT id, name, role, root_directory, webdav_suffix FROM users WHERE id = ? AND password = ?";
         String uid = java.util.UUID.randomUUID().toString();
         dataService.query(sql, rs -> {
             if (!rs.next()) {
@@ -45,6 +46,11 @@ public class SessionService {
             String name = rs.getString("name");
             int rootDir = rs.getInt("root_directory");
             String webdavSuffix = rs.getString("webdav_suffix");
+            //role
+            String roleStr = rs.getString("role");
+            Role role = Role.GUEST;
+            if ("admin".equals(roleStr)) role = Role.ADMIN;
+            else if ("user".equals(roleStr)) role = Role.USER;
             //files key
             byte[] keyBytes = CryptHelper.hashBytes(pass + userId);
             SecretKey key = new SecretKeySpec(keyBytes, "AES");
@@ -55,7 +61,7 @@ public class SessionService {
                 webdavKey = new SecretKeySpec(webdavKeyBytes, "AES");
             }
             //session object
-            SessionDTO session = new SessionDTO(userId, name, rootDir, System.currentTimeMillis() + 3600000, key, webdavKey);
+            SessionDTO session = new SessionDTO(userId, name, role, rootDir, System.currentTimeMillis() + 3600000, key, webdavKey);
             sessions.put(uid, session);
         }, userId, CryptHelper.hashBytes(pass));
         return uid;
@@ -98,17 +104,21 @@ public class SessionService {
             throw new LoginException("Invalid basic auth");
         }
         //query from db
-        String sql = "SELECT w.path, u.webdav_suffix, u.root_directory FROM webdav_tokens W INNER JOIN users U ON w.user_id = u.id WHERE w.token = ? AND u.id = ?";
+        String sql = "SELECT w.path, u.webdav_suffix, u.root_directory, u.role FROM webdav_tokens W INNER JOIN users U ON w.user_id = u.id WHERE w.token = ? AND u.id = ?";
         var session = dataService.queryOne(sql, rs -> {
             String path = "/webdav" + rs.getString(1);
             String suffix = rs.getString(2);
             int rootDir = rs.getInt(3);
+            String roleStr = rs.getString(4);
             if (suffix == null) {
                 throw new ServiceException("Webdav not enabled for user");
             }
+            Role role = Role.GUEST;
+            if ("admin".equals(roleStr)) role = Role.ADMIN;
+            else if ("user".equals(roleStr)) role = Role.USER;
             byte[] keyBytes = CryptHelper.hashBytes(parts[0] + suffix);
             SecretKey key = new SecretKeySpec(keyBytes, "AES");
-            return new WebdavSessionDTO(parts[0], path, rootDir, key);
+            return new WebdavSessionDTO(parts[0], path, role, rootDir, key);
         }, parts[1], parts[0]).orElseThrow(() -> new LoginException("invalid user or password"));
         //cache and return
         wdsessions.put(b64, session);
