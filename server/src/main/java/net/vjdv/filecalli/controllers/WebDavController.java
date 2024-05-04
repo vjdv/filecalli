@@ -89,6 +89,8 @@ public class WebDavController {
                 if (session.role() == Role.GUEST) return ResponseEntity.status(403).body("Forbidden");
                 String mime = request.getHeader("Content-Type");
                 String sizeStr = request.getHeader("Content-Length");
+                if (mime == null) mime = Utils.mimeForExtension(requestPath);
+                if (sizeStr == null) return ResponseEntity.badRequest().body("Content-Length header required");
                 try {
                     long size = Long.parseLong(sizeStr);
                     webdavService.store(requestPath, mime, size, request.getInputStream(), session);
