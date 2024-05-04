@@ -33,10 +33,9 @@ jobs:
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./target/filecalli-${{ steps.pomversion.outputs.VERSION }}.jar
+          asset_path: ./server/target/filecalli-${{ steps.pomversion.outputs.VERSION }}.jar
           asset_name: filecalli-${{ steps.pomversion.outputs.VERSION }}.jar
           asset_content_type: application/java-archive
-        working-directory: ./server
       - name: Renames jar
         run: mv target/filecalli-*.jar target/filecalli.jar
         working-directory: ./server
