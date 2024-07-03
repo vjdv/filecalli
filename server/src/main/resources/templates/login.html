@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.0/css/bulma.min.css">
+</head>
+<body>
+
+<section class="section">
+    <div class="container">
+        <h1 class="title">Login</h1>
+        <form onsubmit="login(event)">
+            <div class="field">
+                <label class="label" for="username">Username</label>
+                <div class="control">
+                    <input class="input" type="text" id="username" placeholder="Username">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="password">Password</label>
+                <div class="control">
+                    <input class="input" type="password" id="password" placeholder="Password">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label" for="duration">Session duration</label>
+                <div class="control">
+                    <div class="select is-medium">
+                        <select id="duration">
+                            <option value="5m">5 minutes</option>
+                            <option value="15m">15 minutes</option>
+                            <option value="1h">1 hour</option>
+                            <option value="1d">1 day</option>
+                            <option value="5d">5 days</option>
+                            <option value="1w">1 week</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="field">
+                <div class="control">
+                    <button class="button is-link">Login</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    function login(evt) {
+        evt.preventDefault();
+        var username = document.getElementById('username').value;
+        var password = document.getElementById('password').value;
+        var duration = document.getElementById('duration').value;
+        var data = {
+            userId: username,
+            pass: password,
+            duration: duration
+        };
+        console.log(data);
+        var url = [[@{/session/login}]];
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        }).then(response => {
+            if (response.ok) {
+                return response.json();
+            } else {
+                console.error('Login failed');
+            }
+        }).then(data => {
+            if (data.success) window.location.reload();
+            else alert(data.message);
+        }).catch(error => {
+            alert(error.message);
+        });
+    }
+    /*]]>*/
+</script>
+
+</body>
+</html>

@@ -36,9 +36,21 @@ public class SessionController {
 
     @PostMapping("/login")
     public ResponseEntity<Result> login(@RequestBody LoginDTO login) {
-        log.info("loggin attempt for user {}", login.userId());
+        log.info("login attempt for user {}", login.userId());
+        long duration = switch (login.duration()) {
+            case "5m" -> 5 * 60 * 1000;
+            case "15m" -> 15 * 60 * 1000;
+            case "1h" -> 60 * 60 * 1000;
+            case "1d" -> 24 * 60 * 60 * 1000;
+            case "5d" -> 5 * 24 * 60 * 60 * 1000;
+            case "1w" -> 7 * 24 * 60 * 60 * 1000;
+            default -> 0;
+        };
+        if (duration == 0) {
+            return ResponseEntity.badRequest().body(Result.failure("Invalid duration"));
+        }
         try {
-            String uid = sessionService.login(login.userId(), login.pass());
+            String uid = sessionService.login(login.userId(), login.pass(), duration);
             var cookie = ResponseCookie.from(Constants.COOKIE_NAME, uid).path("/").httpOnly(true).build();
             return ResponseEntity
                     .ok()

@@ -23,7 +23,7 @@ public class SessionService {
 
     private final DataService dataService;
     private final Map<String, SessionDTO> sessions = new HashMap<>();
-    private final Map<String, WebdavSessionDTO> wdsessions = new HashMap<>();
+    private final Map<String, WebdavSessionDTO> wdSessions = new HashMap<>();
 
     public SessionService(DataService dataService) {
         this.dataService = dataService;
@@ -32,12 +32,13 @@ public class SessionService {
     /**
      * Login a user and create a session
      *
-     * @param userId the user id
-     * @param pass   the user password
+     * @param userId   the user id
+     * @param pass     the user password
+     * @param duration the session duration in milliseconds
      * @return the session uid
      * @throws LoginException if the user or password are invalid
      */
-    public String login(String userId, String pass) {
+    public String login(String userId, String pass, long duration) {
         String sql = "SELECT id, name, role, root_directory, webdav_suffix FROM users WHERE id = ? AND password = ?";
         String uid = java.util.UUID.randomUUID().toString();
         dataService.query(sql, rs -> {
@@ -62,7 +63,7 @@ public class SessionService {
                 webdavKey = new SecretKeySpec(webdavKeyBytes, "AES");
             }
             //session object
-            SessionDTO session = new SessionDTO(userId, name, role, rootDir, System.currentTimeMillis() + 3600000, key, webdavKey);
+            SessionDTO session = new SessionDTO(userId, name, role, rootDir, System.currentTimeMillis() + duration, key, webdavKey);
             sessions.put(uid, session);
         }, userId, CryptHelper.hashBytes(pass));
         return uid;
@@ -88,13 +89,13 @@ public class SessionService {
     /**
      * Get a session from a basic auth string
      *
-     * @param b64 the basic auth string (withoiut the "Basic" prefix)
+     * @param b64 the basic auth string (without the "Basic" prefix)
      * @return session data
      * @throws LoginException if the basic auth is invalid
      */
     public WebdavSessionDTO getSessionFromBasicAuth(String b64) {
         if (b64 == null) throw new LoginException("No basic auth was provided");
-        if (wdsessions.containsKey(b64)) return wdsessions.get(b64);
+        if (wdSessions.containsKey(b64)) return wdSessions.get(b64);
         //reads base64 and extract values
         String[] parts;
         try {
@@ -122,7 +123,7 @@ public class SessionService {
             return new WebdavSessionDTO(parts[0], path, role, rootDir, key);
         }, parts[1], parts[0]).orElseThrow(() -> new LoginException("invalid user or password"));
         //cache and return
-        wdsessions.put(b64, session);
+        wdSessions.put(b64, session);
         return session;
     }
 
