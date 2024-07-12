@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Explorer - Filecalli</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/1.0.1/css/bulma.min.css"
+          integrity="sha512-dF4b2QV/0kq+qlwefqCyb+edbWZ63ihXhE4A2Pju3u4QyaeFzMChqincJsKYwghbclpLE92jPb9yaz/LQ8aNlg=="
+          crossorigin="anonymous" referrerpolicy="no-referrer"/>
+</head>
+<body>
+
+<div class="container">
+    <div class="panel is-primary mt-2">
+        <h1 class="panel-heading">
+            <span th:text="${path}">Explorer path</span>
+            <button class="button">Upload</button>
+        </h1>
+        <a class="panel-block" th:href="@{/web/?path={path}(path=${o.path})}" th:each="o : ${files}">
+            <span class="panel-icon">
+                <svg width="20" height="20">
+                    <use th:xlink:href="@{/img/shapes.svg#directory}" th:if="${o.isDirectory}"></use>
+                    <use th:xlink:href="@{/img/shapes.svg#file}" th:if="${o.isRegularFile}"></use>
+                </svg>
+            </span>
+            <span th:text="${o.name}">Nombre</span>
+        </a>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    /*]]>*/
+</script>
+
+</body>
+</html>

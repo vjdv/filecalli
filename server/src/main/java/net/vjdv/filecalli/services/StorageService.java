@@ -1,10 +1,7 @@
 package net.vjdv.filecalli.services;
 
 import lombok.extern.slf4j.Slf4j;
-import net.vjdv.filecalli.dto.DirDataDTO;
-import net.vjdv.filecalli.dto.FileDataDTO;
-import net.vjdv.filecalli.dto.RetrievedFileDTO;
-import net.vjdv.filecalli.dto.SessionDTO;
+import net.vjdv.filecalli.dto.*;
 import net.vjdv.filecalli.exceptions.ResourceNotFoundException;
 import net.vjdv.filecalli.exceptions.StorageException;
 import net.vjdv.filecalli.util.Configuration;
@@ -46,15 +43,20 @@ public class StorageService {
         int directoryId = resolveDir(path, rootDir, true).id();
         // directories
         String sql1 = "SELECT id, name FROM directories WHERE parent = ?";
-        List<ListedResource> dirs = dataService.queryList(sql1, rs -> new ListedResource(rs.getString(2), true, false, 0, 0, 0), directoryId);
+        List<ListedResource> dirs = dataService.queryList(sql1, rs -> {
+            String name = rs.getString("name");
+            String dirPath = "/".equals(path) ? ("/" + name) :( path + "/" + name);
+            return new ListedResource(name, true, false, dirPath, 0, 0, 0);
+        }, directoryId);
         // files
         String sql2 = "SELECT id, name, size, created_at, last_modified FROM files WHERE directory_id = ?";
         List<ListedResource> files = dataService.queryList(sql2, rs -> {
             String name = rs.getString("name");
+            String filePath =  "/".equals(path) ? ("/" + name) :( path + "/" + name);
             int size = rs.getInt("size");
             long createdAt = rs.getLong("created_at");
             long lastModified = rs.getLong("last_modified");
-            return new ListedResource(name, false, true, size, createdAt, lastModified);
+            return new ListedResource(name, false, true, filePath, size, createdAt, lastModified);
         }, directoryId);
         //return
         List<ListedResource> resources = new ArrayList<>();
@@ -415,10 +417,6 @@ public class StorageService {
             fileName.insert(0, "0");
         }
         return config.getDataPath().resolve(Integer.toHexString(fileId / 1000 + 160)).resolve(fileName.toString());
-    }
-
-    public record ListedResource(String name, boolean isDirectory, boolean isRegularFile, int size, long createdAt,
-                                 long lastModified) {
     }
 
 }
