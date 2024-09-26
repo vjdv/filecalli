@@ -11,4 +11,8 @@ public record FileDataDTO(
         int directoryId
 ) {
 
+    public boolean exists() {
+        return id != 0;
+    }
+
 }

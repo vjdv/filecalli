@@ -4,10 +4,17 @@ import lombok.extern.slf4j.Slf4j;
 import net.vjdv.filecalli.exceptions.LoginException;
 import net.vjdv.filecalli.services.SessionService;
 import net.vjdv.filecalli.services.StorageService;
+import net.vjdv.filecalli.util.Configuration;
 import net.vjdv.filecalli.util.Constants;
+import net.vjdv.filecalli.util.Utils;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.ModelAndView;
+
+import java.io.IOException;
+import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Controller
@@ -31,6 +38,39 @@ public class WebController {
         mav.addObject("path", path);
         mav.addObject("files", list);
         log.info("explorer() path={} {}ms", path, System.currentTimeMillis() - start);
+        return mav;
+    }
+
+    @PostMapping("/upload")
+    public ModelAndView upload(@CookieValue(Constants.COOKIE_NAME) String idSession,
+                               @RequestParam("file") MultipartFile file,
+                               @RequestParam("path") String path) {
+        long start = System.currentTimeMillis();
+        var session = sessionService.getSession(idSession);
+        var mav = new ModelAndView("upload");
+        //variables
+        var name = file.getOriginalFilename();
+        if (name == null || name.isBlank()) name = "noname";
+        name = Utils.cleanFileName(name);
+        var id = UUID.randomUUID().toString();
+        var size = file.getSize();
+        var resolvedFile = storageService.resolveFile(path + name, session.rootDir());
+        //save file to temporal location
+        try {
+            if (size == 0) throw new IOException("Empty file");
+            file.transferTo(Configuration.getInstance().getTempPath().resolve(id));
+        } catch (IOException ex) {
+            log.error("Error receiving file", ex);
+            return new ModelAndView("error", Map.of("message", "Unable to create temporal file"));
+        }
+        //fill variables
+        mav.addObject("id", id);
+        mav.addObject("path", path);
+        mav.addObject("name", name);
+        mav.addObject("newSize", String.format("%,d", size));
+        mav.addObject("exists", resolvedFile.exists());
+        mav.addObject("oldSize", String.format("%,d", resolvedFile.size()));
+        log.info("upload() path={} {}ms", path, System.currentTimeMillis() - start);
         return mav;
     }
 

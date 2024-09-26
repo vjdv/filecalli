@@ -10,6 +10,20 @@ public interface Utils {
         return DateTimeFormatter.RFC_1123_DATE_TIME.format(Instant.ofEpochMilli(time).atOffset(ZoneOffset.UTC));
     }
 
+    static String cleanFileName(String filename) {
+        while (filename.contains("\\")) filename = filename.replace("\\", "/");
+        while (filename.contains("/")) filename = filename.replace("/", "");
+        while (filename.contains("..")) filename = filename.replace("..", ".");
+        while (filename.contains(":")) filename = filename.replace(":", "");
+        while (filename.contains("*")) filename = filename.replace("*", "");
+        while (filename.contains("?")) filename = filename.replace("?", "");
+        while (filename.contains("\"")) filename = filename.replace("\"", "");
+        while (filename.contains("<")) filename = filename.replace("<", "");
+        while (filename.contains(">")) filename = filename.replace(">", "");
+        while (filename.contains("|")) filename = filename.replace("|", "");
+        return filename;
+    }
+
     static String mimeForExtension(String filename) {
         int dot = filename.lastIndexOf('.');
         if (dot == -1) {

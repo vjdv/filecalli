@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Explorer - Filecalli</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/1.0.1/css/bulma.min.css"
+          integrity="sha512-dF4b2QV/0kq+qlwefqCyb+edbWZ63ihXhE4A2Pju3u4QyaeFzMChqincJsKYwghbclpLE92jPb9yaz/LQ8aNlg=="
+          crossorigin="anonymous" referrerpolicy="no-referrer"/>
+</head>
+<body>
+
+<div class="container">
+    <form class="card mx-auto mt-2" style="max-width: 600px;">
+        <div class="card-header has-background-info">
+            <h1 class="card-header-title has-text-dark" th:if="${exists}">Overwrite this file?</h1>
+            <h1 class="card-header-title has-text-dark" th:unless="${exists}">Upload new file?</h1>
+        </div>
+        <div class="card-content">
+            <div class="columns">
+                <div class="column">Filename</div>
+                <div class="column"><input class="input" th:value="${name}"/></div>
+            </div>
+            <div class="columns">
+                <div class="column">Location</div>
+                <div class="column"><input class="input" th:value="${path}" readonly/></div>
+            </div>
+            <div class="columns" th:unless="${exists}">
+                <div class="column">Size</div>
+                <div class="column"><span th:text="${newSize}" th:remove="tag">0</span> bytes</div>
+            </div>
+            <div class="columns" th:if="${exists}">
+                <div class="column">Old Size</div>
+                <div class="column"><span th:text="${oldSize}" th:remove="tag">0</span> bytes</div>
+            </div>
+            <div class="columns" th:if="${exists}">
+                <div class="column">New Size</div>
+                <div class="column"><span th:text="${newSize}" th:remove="tag">0</span> bytes</div>
+            </div>
+        </div>
+        <footer class="card-footer">
+            <input class="card-footer-item button is-success" type="submit" value="Confirm"/>
+            <input class="card-footer-item button is-danger" type="button" onclick="window.location.href='/web/'"
+                   value="Cancel"/>
+        </footer>
+        <input type="hidden" name="id" th:value="${id}"/>
+    </form>
+</div>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+
+    /*]]>*/
+</script>
+
+</body>
+</html>

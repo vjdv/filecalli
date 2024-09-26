@@ -45,14 +45,14 @@ public class StorageService {
         String sql1 = "SELECT id, name FROM directories WHERE parent = ?";
         List<ListedResource> dirs = dataService.queryList(sql1, rs -> {
             String name = rs.getString("name");
-            String dirPath = "/".equals(path) ? ("/" + name) :( path + "/" + name);
+            String dirPath = "/".equals(path) ? ("/" + name) : (path + "/" + name);
             return new ListedResource(name, true, false, dirPath, 0, 0, 0);
         }, directoryId);
         // files
         String sql2 = "SELECT id, name, size, created_at, last_modified FROM files WHERE directory_id = ?";
         List<ListedResource> files = dataService.queryList(sql2, rs -> {
             String name = rs.getString("name");
-            String filePath =  "/".equals(path) ? ("/" + name) :( path + "/" + name);
+            String filePath = "/".equals(path) ? ("/" + name) : (path + "/" + name);
             int size = rs.getInt("size");
             long createdAt = rs.getLong("created_at");
             long lastModified = rs.getLong("last_modified");
@@ -385,11 +385,12 @@ public class StorageService {
      * @return file data, if the file does not exist, the fileId is 0
      * @throws ResourceNotFoundException if the directory does not exist
      */
-    protected FileDataDTO resolveFile(String path, int rootDir) {
+    public FileDataDTO resolveFile(String path, int rootDir) {
         if ("/".equals(path)) throw new ResourceNotFoundException("Invalid file path");
         if (!path.startsWith("/")) throw new ResourceNotFoundException("Path must start with /");
         int slashIndex = path.lastIndexOf("/");
         String dirPath = path.substring(0, slashIndex);
+        if (dirPath.isBlank()) dirPath = "/";
         String fileName = path.substring(slashIndex + 1);
         var dirData = resolveDir(dirPath, rootDir, true);
         String sql = "SELECT id, name, mime, size, created_at, last_modified FROM files WHERE name = ? AND directory_id = ?";

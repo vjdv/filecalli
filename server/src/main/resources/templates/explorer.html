@@ -14,7 +14,7 @@
     <div class="panel is-primary mt-2">
         <h1 class="panel-heading">
             <span th:text="${path}">Explorer path</span>
-            <button class="button">Upload</button>
+            <button id="upload-btn" class="button">Upload</button>
         </h1>
         <a class="panel-block" th:href="@{/web/?path={path}(path=${o.path})}" th:each="o : ${files}">
             <span class="panel-icon">
@@ -28,8 +28,26 @@
     </div>
 </div>
 
+<form id="upload-form" th:action="@{/web/upload}" method="POST" enctype="multipart/form-data">
+    <input type="file" id="file" name="file" style="display: none;">
+    <input type="hidden" name="path" th:value="${path}">
+    <input type="submit" style="display: none;">
+</form>
+
 <script th:inline="javascript">
     /*<![CDATA[*/
+    const uploadButton = document.querySelector('#upload-btn');
+    const fileInput = document.querySelector('#file');
+    const uploadForm = document.querySelector('#upload-form');
+    uploadButton.addEventListener('click', () => {
+        fileInput.click();
+    });
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length === 0) {
+            return;
+        }
+        uploadForm.submit();
+    });
     /*]]>*/
 </script>
 
